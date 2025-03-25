@@ -1,0 +1,1210 @@
+# Load Packages
+```{r}
+library(ggplot2)
+library(dplyr)
+library(readr)
+library(usmap)
+library(tidyr)
+library(haven)
+library(stargazer)
+library(broom)
+library(kableExtra)
+library(ggpubr)
+library(gridExtra)
+
+```
+
+# US Heat Map Pain
+```{r}
+Pain_Data <- read_csv("C:/Users/Sebastian Pintea/OneDrive/Documents/Stanford Summer R/Pain Data.csv")
+Pain_Data <- Pain_Data %>%
+  mutate(state = fipsst)
+
+# Plot the US heat map
+plot_usmap(data = Pain_Data, values = "percent_chronic_pain", color = "white") +
+  scale_fill_continuous(name = "Percentage of Chronic Pain", label = scales::comma) +
+  scale_fill_gradient(name = "Percentage of Chronic Pain", 
+                      low = "lightblue", high = "darkblue",  # Adjust gradient colors as needed
+                      na.value = "grey90", guide = "legend") + 
+  labs(title = "Chronic Pain Frequency in Children by State",
+       caption = "Source: National Survey of Childrens Health (NSCH)") +
+  theme_void() +
+  theme(plot.title = element_text(size = 16, hjust = 0.5),
+        plot.subtitle = element_text(size = 14, hjust = 0.5),
+        plot.caption = element_text(size = 10, hjust = 0.5))
+
+```
+
+# US Heat Map PM2.5
+```{r}
+AQI_data <- read_csv("C:/Users/Sebastian Pintea/OneDrive/Documents/Stanford Summer R/annual_aqi_by_cbsa_2022.csv")
+AQI_data <- annual_aqi_by_cbsa_2022 %>%
+  mutate(CBSA = sub(".*,\\s*", "", CBSA))
+
+AQI_state_averages <- AQI_data %>% 
+  select(-`CBSA Code`, -Year) %>%
+  group_by(CBSA) %>%
+  summarize(across(everything(), ~ mean(.x, na.rm = TRUE), .names = "avg_{.col}"))
+
+AQI_state_averages <- AQI_state_averages %>%
+  filter(!grepl("-", CBSA))
+
+state_mapping <- data.frame(state_abbrev = state.abb,
+                            state = state.name,
+                            stringsAsFactors = FALSE)
+
+AQI_state_averages <- AQI_state_averages %>%
+  left_join(state_mapping, by = c("CBSA" = "state_abbrev")) 
+
+plot_usmap(data = AQI_state_averages, values = "avg_Days PM2.5", color = "white") +
+  scale_fill_continuous(name = "Average Days of PM2.5", label = scales::comma) +
+  scale_fill_gradient(name = "Average Days of of PM2.5", 
+                      low = "lightblue", high = "darkblue",  # Adjust gradient colors as needed
+                      na.value = "grey90", guide = "legend") + 
+  labs(title = "Average Number of Days with High PM 2.5 by State",
+       caption = "Source: Environmental Protection Agency (EPA") +
+  theme_void() +
+  theme(plot.title = element_text(size = 16, hjust = 0.5),
+        plot.subtitle = element_text(size = 14, hjust = 0.5),
+        plot.caption = element_text(size = 10, hjust = 0.5))
+
+```
+
+# Collab data PM2.5
+```{r}
+
+merged_data <- merge(AQI_state_averages, Pain_Data, by = "state")
+merged_data <- merged_data %>%
+  select(state, `avg_Days PM2.5`, percent_chronic_pain, chronic_pain)
+
+write.csv(merged_data, file = "my_dataset.csv", row.names = FALSE)
+
+str(merged_data)
+
+# Shapiro-Wilk test for avg_high_PM2.5_days
+shapiro.test(merged_data$`avg_Days PM2.5`)
+
+# Shapiro-Wilk test for percent_chronic_pain
+shapiro.test(merged_data$chronic_pain)
+
+overall_correlation <- cor(merged_data$`avg_Days PM2.5`, merged_data$percent_chronic_pain, method = "pearson")
+overall_correlation_test <- cor.test(merged_data$`avg_Days PM2.5`, merged_data$percent_chronic_pain, method = "pearson")
+
+cat("Pearson correlation:", overall_correlation, "\n")
+cat("P-value:", overall_correlation_test$p.value, "\n")
+
+```
+
+# US Heat Map Max AQI
+```{r}
+
+maqi_data <- annual_aqi_by_cbsa_2022 %>%
+  mutate(CBSA = sub(".*,\\s*", "", CBSA))
+
+maqi_state_averages <- maqi_data %>% 
+  select(-`CBSA Code`, -Year) %>%
+  group_by(CBSA) %>%
+  summarize(across(everything(), ~ mean(.x, na.rm = TRUE), .names = "avg_{.col}"))
+
+maqi_state_averages <- maqi_state_averages %>%
+  filter(!grepl("-", CBSA))
+
+state_mapping <- data.frame(state_abbrev = state.abb,
+                            state = state.name,
+                            stringsAsFactors = FALSE)
+
+maqi_state_averages <- maqi_state_averages %>%
+  left_join(state_mapping, by = c("CBSA" = "state_abbrev"))
+
+
+plot_usmap(data = maqi_state_averages, values = "avg_Max AQI", color = "white") +
+  scale_fill_continuous(name = "Average Max AQI", label = scales::comma) +
+  scale_fill_gradient(name = "Average Max AQI", 
+                      low = "lightblue", high = "darkblue",  # Adjust gradient colors as needed
+                      na.value = "grey90", guide = "legend") + 
+  labs(title = "Average Max AQI by State",
+       caption = "Source: Environmental Protection Agency (EPA") +
+  theme_void() +
+  theme(plot.title = element_text(size = 16, hjust = 0.5),
+        plot.subtitle = element_text(size = 14, hjust = 0.5),
+        plot.caption = element_text(size = 10, hjust = 0.5))
+
+```
+
+# Collab data Max AQI (National)
+```{r}
+Pain_DCVA <- Pain_Data %>% 
+  mutate(state = ifelse(state == "District of Columbia", "Maryland", state)) %>%
+  group_by(state) %>%
+  summarise(
+    chronic_pain = sum(chronic_pain),
+    percent_chronic_pain = sum(percent_chronic_pain)
+  )
+  
+merged_data_A <- merge(maqi_state_averages, Pain_Data, by = "state")
+merged_data_A <- merged_data_A %>%
+  select(state, `avg_Max AQI`, percent_chronic_pain, chronic_pain)
+
+# Shapiro-Wilk test for avg_high_PM2.5_days
+shapiro.test(merged_data_A$`avg_Max AQI`)
+
+# Shapiro-Wilk test for percent_chronic_pain
+shapiro.test(merged_data_A$chronic_pain)
+
+overall_correlation_A <- cor(merged_data_A$`avg_Max AQI`, merged_data_A$percent_chronic_pain, method = "pearson")
+overall_correlation_test_A <- cor.test(merged_data_A$`avg_Max AQI`, merged_data_A$percent_chronic_pain, method = "pearson")
+print(overall_correlation_test_A)
+
+cat("Pearson correlation:", overall_correlation_A, "\n")
+cat("P-value:", overall_correlation_test_A$p.value, "\n")
+
+ggplot(merged_data_A, aes(x = `avg_Max AQI`, y = percent_chronic_pain)) +
+  geom_point() +
+  geom_smooth(method = "lm", se = FALSE, color = "blue") +
+  labs(
+    title = "Correlation between Average Max AQI Days and Number of Children with Chronic Pain",
+    x = "Average Max AQI",
+    y = "Number of Children with Chronic Pain"
+  ) +
+  annotate("text", x = max(merged_data_A$`avg_Max AQI`), y = min(merged_data_A$percent_chronic_pain), 
+           label = paste("Pearson correlation:", round(overall_correlation_A, 2), "\nP-value:", format(overall_correlation_test_A$p.value, scientific = TRUE)), 
+           hjust = 1, vjust = 0, size = 5, color = "red")
+
+```
+
+
+# Univariate Linear regression
+```{r}
+
+model_test <- lm(percent_chronic_pain ~ `avg_Max AQI`, data = merged_data_A)
+model_test_summary <- summary(model_test)
+
+summary(model_test)
+cat("Coefficients:\n")
+print(model_test_summary$coefficients)
+cat("P-value of the model:", model_test_summary$fstatistic[3], "\n")
+cat("Beta coefficient (slope) of 'avg_Max AQI':", beta_coefficient, "\n")
+print(model_test_summary)
+
+# Plot the data and the regression line
+ggplot(merged_data_A, aes(x = `avg_Max AQI`, y = percent_chronic_pain)) +
+  geom_point() +
+  geom_smooth(method = "lm", se = FALSE, color = "blue") +
+  labs(
+    title = "Correlation between Average Max AQI Days and Number of Children with Chronic Pain",
+    x = "Average Max AQI",
+    y = "Percent of Children with Chronic Pain"
+  ) +
+  annotate("text", x = max(merged_data_A$`avg_Max AQI`), y = min(merged_data_A$percent_chronic_pain) + 2, 
+           label = paste("Regression p-value:", sprintf("%.5e", regression_p_value)), 
+           hjust = 1, vjust = 0, size = 5, color = "red") +
+  annotate("text", x = max(merged_data_A$`avg_Max AQI`), y = min(merged_data_A$percent_chronic_pain) + 2, 
+           label = paste("Beta coefficient:", round(beta_coefficient, 5), "\nRegression p-value:", sprintf("%.5e", regression_p_value)), 
+           hjust = 1, vjust = 0, size = 5, color = "darkgreen")
+
+beta_coefficient <- model_test_summary$coefficients[2, 1]
+regression_p_value <- model_test_summary$coefficients[2, 4]
+```
+
+
+# Multivariable Analysis (Asthma, Presence of a Park, ACE, Depression, Medical Care in past 12 months)
+```{r}
+merged_multi <- merge(aggregated_multivariable, maqi_state_averages, by = "state")
+merged_multi <- merged_multi %>%
+  select(state, `avg_Max AQI`, chronic_pain_pct, asthma_pct, ACE_nviolence_pct, depression_pct, medical_care_pct, park_pct)
+
+model_multi <- lm(chronic_pain_pct ~ `avg_Max AQI`+ asthma_pct + ACE_nviolence_pct + depression_pct + medical_care_pct + park_pct, data = merged_multi)
+model_multi_summary <- summary(model_multi)
+print(model_multi_summary)
+
+df1 <- model_multi_summary$fstatistic[2]
+df2 <- model_multi_summary$fstatistic[3]
+regression_p_valuem <- pf(regression_p_valuem, df1, df2, lower.tail = FALSE)
+beta_coefficientm <- coef(model)["`avg_Max AQI`"]
+print(regression_p_valuem)
+
+ggplot(merged_multi, aes(x = `avg_Max AQI`, y = chronic_pain_pct)) +
+  geom_point() +
+  geom_smooth(method = "lm", se = FALSE, color = "blue") +
+  labs(
+    title = "Correlation between Average Max AQI Days and Percent of Children with Chronic Pain",
+    x = "Average Max AQI",
+    y = "Percent of Children with Chronic Pain"
+  ) +
+  annotate("text", x = max(merged_multi$`avg_Max AQI`), 
+           y = min(merged_multi$chronic_pain_pct) + 2, 
+           label = paste("Regression p-value:", sprintf("%.5e", regression_p_valuem)), 
+           hjust = 1, vjust = 0, size = 5, color = "red") +
+  annotate("text", x = max(merged_multi$`avg_Max AQI`), 
+           y = min(merged_multi$chronic_pain_pct) + 1, 
+           label = paste("Beta coefficient:", round(beta_coefficientm, 5)), 
+           hjust = 1, vjust = 0, size = 5, color = "darkgreen")
+
+multi_regressplot <- ggplot(merged_multi, aes(x = `avg_Max AQI`, y = chronic_pain_pct)) +
+  geom_point() +
+  geom_smooth(method = "lm", se = FALSE, color = "blue") +
+  labs(
+    title = "Correlation between Average Max AQI Days and Percent of Children with Chronic Pain",
+    x = "Average Max AQI",
+    y = "Percent of Children with Chronic Pain"
+  )
+print(multi_regressplot)
+
+# Table and Graph
+coefficients_table <- as.data.frame(model_multi_summary$coefficients)
+coefficients_table <- cbind(Variable = rownames(coefficients_table), coefficients_table)
+rownames(coefficients_table) <- NULL
+beta_coefficientm2 <- coefficients_table[coefficients_table$Variable == "`avg_Max AQI`", "Estimate"]
+
+summary_table2 <- data.frame(
+  Metric = c("Regression p-value", "Beta Coefficient"),
+  Value = c(sprintf("%.5e", regression_p_valuem), round(beta_coefficientm, 5))
+)
+
+table_grob <- tableGrob(coefficients_table, rows = NULL, theme = ttheme_minimal())
+summary_grob <- tableGrob(summary_table2, rows = NULL, theme = ttheme_minimal())
+combined_table <- arrangeGrob(table_grob, summary_grob, ncol = 1)
+
+combined_plot2 <- grid.arrange(multi_regressplot, combined_table, ncol = 2, widths = c(2,1))
+
+ggsave("model_summary.png", combined_plot2, width = 20, height = 6)
+
+```
+
+# Multivariable Analysis Part 2 (Max AQI)
+```{r}
+merged_multi2 <- merge(updated_multivariable, maqi_state_averages, by = "state")
+merged_multi2 <- merged_multi2 %>%
+  select(state, `avg_Max AQI`, sex_femalepct, mean_age, racial_minorities_pct, hhi_poverty_level_pct, history_moving_pct, US_birthplace_pct, chronic_pain_pct, depression_pct)
+
+model_multi2 <- lm(chronic_pain_pct ~ `avg_Max AQI`+ sex_femalepct + mean_age + racial_minorities_pct + hhi_poverty_level_pct + history_moving_pct + US_birthplace_pct + depression_pct, data = merged_multi2)
+model_multi_summary2 <- summary(model_multi2)
+print(model_multi_summary2)
+
+multi_regressplot2 <- ggplot(merged_multi2, aes(x = `avg_Max AQI`, y = chronic_pain_pct)) +
+  geom_point() +
+  geom_smooth(method = "lm", se = FALSE, color = "blue") +
+  labs(
+    title = "Correlation between Average Max AQI Days and Percent of Children with Chronic Pain",
+    x = "Average Max AQI",
+    y = "Percent of Children with Chronic Pain"
+  )
+print(multi_regressplot2)
+
+f_statistic_value <- model_multi_summary2$fstatistic[1]
+f_statistic_df1 <- model_multi_summary2$fstatistic[2]
+f_statistic_df2 <- model_multi_summary2$fstatistic[3]
+
+# Calculate the p-value for the F-statistic
+f_statistic_p_value <- pf(f_statistic_value, df1 = f_statistic_df1, df2 = f_statistic_df2, lower.tail = FALSE)
+formatted_p_value <- sprintf("%.2e", f_statistic_p_value)
+print(formatted_p_value)
+
+# Table and Graph
+coefficients_table2 <- as.data.frame(model_multi_summary2$coefficients)
+coefficients_table2 <- cbind(Variable = rownames(coefficients_table2), coefficients_table2)
+rownames(coefficients_table2) <- NULL
+beta_coefficientm22 <- coefficients_table2[coefficients_table2$Variable == "`avg_Max AQI`", "Estimate"]
+
+summary_table22 <- data.frame(
+  Metric = c("Regression p-value", "Beta Coefficient"),
+  Value = c(sprintf("%e", f_statistic_p_value), round(beta_coefficientm22, 5))
+)
+print(summary_table22)
+
+table_grob2 <- tableGrob(coefficients_table2, rows = NULL, theme = ttheme_minimal())
+summary_grob2 <- tableGrob(summary_table22, rows = NULL, theme = ttheme_minimal())
+combined_table2 <- arrangeGrob(table_grob2, summary_grob2, ncol = 1)
+
+combined_plot22 <- grid.arrange(multi_regressplot2, combined_table2, ncol = 2, widths = c(2,1))
+
+ggsave("model_summary2.png", combined_plot2, width = 20, height = 6)
+
+```
+
+# Multivariable Individual
+```{r}
+# Assuming indiv_multivariable and maqi_state_averages are already defined
+merged_multi5 <- merge(indiv_multivariable, maqi_state_averages, by = "state")
+merged_multi5 <- merged_multi5 %>%
+  select(state, `avg_Max AQI`, sex, age, race_ethnicity, hhi_poverty_level, history_moving, US_birthplace, chronic_pain, depression)
+
+# Fit the logistic regression model
+model_multi5 <- glm(chronic_pain ~ `avg_Max AQI` + sex + age + race_ethnicity + hhi_poverty_level + history_moving + US_birthplace + depression, data = merged_multi5, family = binomial())
+model_multi_summary5 <- summary(model_multi5)
+print(model_multi_summary5)
+
+# Predict probabilities
+merged_multi5$predicted_prob <- predict(model_multi5, type = "response")
+head(merged_multi5$predicted_prob)
+contrasts(model_multi5$chronic_pain)
+
+# Plot #1
+ggplot(merged_multi5, aes(x = `avg_Max AQI`, y = chronic_pain)) +
+  geom_point(aes(color = factor(chronic_pain)), size = 3, alpha = 0.5) +
+  geom_smooth(method = "glm", method.args = list(family = "binomial"), se = FALSE, color = "blue") +
+  labs(
+    title = "Logistic Regression Fit with ggplot2",
+    x = "Average Maximum AQI",
+    y = "Chronic Pain",
+    color = "Chronic Pain (Observed)"
+  ) +
+  theme_minimal() +
+  ylim(0, 1)  # Ensure y-axis is between 0 and 1
+
+ggsave("plotm5.png", plotm5, width = 30, height = 10)
+
+```
+
+# Multivariable Median AQI
+```{r}
+merged_multi3 <- merge(updated_multivariable, maqi_state_averages, by = "state")
+merged_multi3 <- merged_multi3 %>%
+  select(state, `avg_Median AQI`, sex_femalepct, mean_age, racial_minorities_pct, hhi_poverty_level_pct, history_moving_pct, US_birthplace_pct, chronic_pain_pct, depression_pct)
+
+model_multi3 <- lm(chronic_pain_pct ~ `avg_Median AQI`+ sex_femalepct + mean_age + racial_minorities_pct + hhi_poverty_level_pct + history_moving_pct + US_birthplace_pct + depression_pct, data = merged_multi3)
+model_multi_summary3 <- summary(model_multi3)
+print(model_multi_summary3)
+
+```
+
+# Multivariable PM2.5
+```{r}
+merged_multi4 <- merge(updated_multivariable, maqi_state_averages, by = "state")
+merged_multi4 <- merged_multi4 %>%
+  select(state, `avg_Days PM2.5`, sex_femalepct, mean_age, racial_minorities_pct, hhi_poverty_level_pct, history_moving_pct, US_birthplace_pct, chronic_pain_pct, depression_pct)
+
+model_multi4 <- lm(chronic_pain_pct ~ `avg_Days PM2.5`+ sex_femalepct + mean_age + racial_minorities_pct + hhi_poverty_level_pct + history_moving_pct + US_birthplace_pct + depression_pct, data = merged_multi4)
+model_multi_summary4 <- summary(model_multi4)
+print(model_multi_summary4)
+
+```
+
+# Race Covariate %
+```{r}
+aggregated_datap <- aggregated_painrace %>%
+  rename(state = fipsst)
+merged_rp <- merge(maqi_state_averages, aggregated_datap) 
+merged_rp <- merged_rp %>%
+  mutate(sc_race_r = as.factor(sc_race_r))
+
+merged_rp$sc_race_r <- relevel(merged_rp$sc_race_r, ref = "White alone")
+
+model2 <- lm(percent_chronic_pain ~ `avg_Max AQI` + sc_race_r, data = merged_rp)
+model_summary2 <- summary(model2)
+print(model_summary2)
+
+p_values2 <- model_summary2$coefficients[, "Pr(>|t|)"]
+p_value_aqi2 <- p_values2["avg_Max AQI"]
+print(p_values2)
+
+race_levels2 <- levels(merged_rp$sc_race_r)
+race_p_values2 <- sapply(race_levels2[1:6], function(r) p_values2[paste0("sc_race_r", r)])
+
+# Combine into a single character string for annotation
+race_p_value_annotation2 <- paste(race_levels2[1:6], "p-value =", format(race_p_values2, digits = 3), collapse = "; ")
+print(race_p_value_annotation2)
+
+co_variable2 <- ggplot(merged_rp, aes(x = `avg_Max AQI`, y = percent_chronic_pain, color = sc_race_r)) +
+  geom_point() +
+  geom_smooth(method = "lm", se = FALSE) +
+  labs(title = "Regression of Chronic Pain on Max AQI with Race Covariate",
+       x = "Max AQI",
+       y = "Percent Chronic Pain") +
+  annotate("text", x = min(merged_rp$`avg_Max AQI`), y = max(merged_rp$percent_chronic_pain) - 20,
+           label = paste("p-value (Max AQI) =", format(p_value_aqi2, digits = 3)),
+           hjust = 0, vjust = 1, size = 4, color = "blue") +
+  annotate("text", x = min(merged_rp$`avg_Max AQI`), y = max(merged_rp$percent_chronic_pain) - 40,
+           label = race_p_value_annotation2,
+           hjust = 0, vjust = 1, size = 4, color = "blue") +
+  theme_minimal() +
+  theme(plot.title = element_text(size = 30), 
+        axis.title = element_text(size = 25), 
+        axis.text = element_text(size = 25))
+print(co_variable2)
+
+ggsave("regression_plot2.png", co_variable2, width = 50, height = 15)
+```
+
+# Race Covariate New
+```{r}
+
+merged_rp2 <- merged_rp %>%
+  mutate(sc_race_r = as.factor(sc_race_r))
+
+# Create dummy variables for each race
+dummy_vars <- model.matrix(~ sc_race_r - 1, data = merged_rp2)
+colnames(dummy_vars) <- make.names(colnames(dummy_vars))
+dummy_df <- as.data.frame(dummy_vars)
+
+merged_rp2 <- cbind(merged_rp2, dummy_df)
+
+model_formula <- as.formula(paste("percent_chronic_pain ~ `avg_Max AQI` +", 
+                                  paste(colnames(dummy_df), collapse = " + ")))
+
+model22 <- lm(model_formula, data = merged_rp2)
+model_summary22 <- summary(model22)
+print(model_summary22)
+
+p_values22 <- model_summary22$coefficients[, "Pr(>|t|)"]
+p_value_aqi22 <- p_values2["`avg_Max AQI`"]
+
+# Extract p-values for race dummy variables
+race_p_values22 <- p_values22[grep("^sc_race_r", names(p_values22))]
+race_p_value_annotation22 <- paste(names(race_p_values22), "p-value =", format(race_p_values22, digits = 3), collapse = "; ")
+print(race_p_value_annotation22)
+
+co_variable22 <- ggplot(merged_rp2, aes(x = `avg_Max AQI`, y = percent_chronic_pain, color = sc_race_r)) +
+  geom_point() +
+  geom_smooth(method = "lm", se = FALSE) +
+  labs(title = "Regression of Chronic Pain on Max AQI with Race Covariate",
+       x = "Max AQI",
+       y = "Percent Chronic Pain") +
+  annotate("text", x = min(merged_rp2$`avg_Max AQI`), y = max(merged_rp2$percent_chronic_pain) - 20,
+           label = paste("p-value (Max AQI) =", format(p_value_aqi22, digits = 3)),
+           hjust = 0, vjust = 1, size = 4, color = "blue") +
+  annotate("text", x = min(merged_rp2$`avg_Max AQI`), y = max(merged_rp2$percent_chronic_pain) - 40,
+           label = race_p_value_annotation22,
+           hjust = 0, vjust = 1, size = 4, color = "blue") +
+  theme_minimal() +
+  theme(plot.title = element_text(size = 30), 
+        axis.title = element_text(size = 25), 
+        axis.text = element_text(size = 25))
+
+print(co_variable22)
+
+ggsave("regression_plot3.png", co_variable22, width = 30, height = 15)
+
+```
+
+# Problems Paying for Medical
+```{r}
+
+aggregated_datapr <- aggregated_painproblems %>%
+  rename(state = fipsst)
+merged_p <- merge(maqi_state_averages, aggregated_datapr)
+merged_p <- merged_p %>%
+  mutate(k3q25 = as.factor(k3q25))
+
+model_initial <- lm(percent_chronic_pain ~ `avg_Max AQI`, data = merged_p)
+summary_initial <- summary(model_initial)
+print(summary_initial)
+
+# Extended model with insurance issue
+model_extended <- lm(percent_chronic_pain ~ `avg_Max AQI` + k3q25, data = merged_p)
+summary_extended <- summary(model_extended)
+print(summary_extended)
+
+# Compare coefficients of avg_Max AQI
+coef_initial <- summary_initial$coefficients["`avg_Max AQI`", ]
+coef_extended <- summary_extended$coefficients["`avg_Max AQI`", ]
+
+p_value_initial <- coef_initial["Pr(>|t|)"]
+p_value_extended <- coef_extended["Pr(>|t|)"]
+
+p_values_insurance <- summary_extended$coefficients[grepl("k3q25", rownames(summary_extended$coefficients)), "Pr(>|t|)"]
+
+# Format the p-values for annotation
+insurance_levels <- levels(merged_p$k3q25)
+insurance_p_value_annotation <- paste(insurance_levels[-1], "p-value =", format(p_values_insurance, digits = 3), collapse = "; ")
+
+# Plot the results
+co_variable3 <- ggplot(merged_p, aes(x = `avg_Max AQI`, y = percent_chronic_pain, color = k3q25)) +
+  geom_point() +
+  geom_smooth(method = "lm", se = FALSE) +
+  labs(title = "Regression of Chronic Pain on Max AQI with Insurance Issue Covariate",
+       x = "Max AQI",
+       y = "Chronic Pain") +
+  annotate("text", x = min(merged_p$`avg_Max AQI`), y = max(merged_p$percent_chronic_pain) - 40,
+           label = insurance_p_value_annotation,
+           hjust = 0, vjust = 1, size = 4, color = "red") + theme_minimal() +
+  theme(plot.title = element_text(size = 30), 
+        axis.title = element_text(size = 25), 
+        axis.text = element_text(size = 25))
+
+print(co_variable3)
+
+ggsave("regression_plot4.png", co_variable3, width = 30, height = 15)
+
+
+```
+
+
+# Sex
+```{r}
+aggregated_sex <- aggregated_pain_sex %>%
+  rename(state = fipsst)
+merged_sex <- merge(maqi_state_averages, aggregated_sex)
+merged_sex <- merged_sex %>%
+  mutate(sc_sex = as.factor(sc_sex))
+
+model_sex <- lm(percent_chronic_pain ~ `avg_Max AQI`, data = merged_sex)
+summary_sex <- summary(model_sex)
+print(summary_sex)
+
+merged_sex$sc_sex <- relevel(merged_sex$sc_sex, ref = "Male")
+
+# Extended model with sex
+model_sex2 <- lm(percent_chronic_pain ~ `avg_Max AQI` + sc_sex, data = merged_sex)
+summary_sex2 <- summary(model_sex2)
+print(summary_sex2)
+
+# Compare coefficients of avg_Max AQI
+coef_sex <- summary_sex$coefficients["`avg_Max AQI`", ]
+coef_sex2 <- summary_sex2$coefficients["`avg_Max AQI`", ]
+
+p_value_sex <- coef_sex["Pr(>|t|)"]
+p_value_sex2 <- coef_sex2["Pr(>|t|)"]
+
+p_values_sextotal <- summary_sex2$coefficients[grepl("sc_sex", rownames(summary_sex2$coefficients)), "Pr(>|t|)"]
+
+# Format the p-values for annotation
+sex_levels <- levels(merged_sex$sc_sex)
+sex_p_value_annotation <- paste(sex_levels[-1], "p-value =", format(p_values_sextotal, digits = 3), collapse = "; ")
+
+# Plot the results
+ggplot(merged_sex, aes(x = `avg_Max AQI`, y = percent_chronic_pain, color = sc_sex)) +
+  geom_point() +
+  geom_smooth(method = "lm", se = FALSE) +
+  labs(title = "Regression of Chronic Pain on Max AQI with Sex Covariate",
+       x = "Max AQI",
+       y = "Chronic Pain") +
+  annotate("text", x = min(merged_sex$`avg_Max AQI`), y = max(merged_sex$percent_chronic_pain) - 40,
+           label = sex_p_value_annotation,
+           hjust = 0, vjust = 1, size = 4, color = "red") + theme_minimal() +
+  theme(plot.title = element_text(size = 30), 
+        axis.title = element_text(size = 25), 
+        axis.text = element_text(size = 25))
+
+```
+
+
+# Park
+```{r}
+aggregated_park <- aggregated_pain_park %>%
+  rename(state = fipsst)
+merged_park <- merge(maqi_state_averages, aggregated_park)
+merged_park <- merged_park %>%
+  mutate(k10q12 = as.factor(k10q12))
+
+model_park <- lm(percent_chronic_pain ~ `avg_Max AQI`, data = merged_park)
+summary_park <- summary(model_park)
+print(summary_park)
+
+merged_park$k10q12 <- relevel(merged_park$k10q12, ref = "No valid response")
+
+# Extended model with park access
+model_park2 <- lm(percent_chronic_pain ~ `avg_Max AQI` + k10q12, data = merged_park)
+summary_park2 <- summary(model_park2)
+print(summary_park2)
+
+# Compare coefficients of avg_Max AQI
+coef_park <- summary_park$coefficients["`avg_Max AQI`", ]
+coef_park2 <- summary_park2$coefficients["`avg_Max AQI`", ]
+
+p_value_park <- coef_park["Pr(>|t|)"]
+p_value_park2 <- coef_park2["Pr(>|t|)"]
+
+p_values_parktotal <- summary_park2$coefficients[grepl("k10q12", rownames(summary_park2$coefficients)), "Pr(>|t|)"]
+
+# Format the p-values for annotation
+park_levels <- levels(merged_park$k10q12)
+park_p_value_annotation <- paste(park_levels[-1], "p-value =", format(p_values_parktotal, digits = 3), collapse = "; ")
+
+# Plot the results
+ggplot(merged_park, aes(x = `avg_Max AQI`, y = percent_chronic_pain, color = k10q12)) +
+  geom_point() +
+  geom_smooth(method = "lm", se = FALSE) +
+  labs(title = "Regression of Chronic Pain on Max AQI with Park Presence Covariate",
+       x = "Max AQI",
+       y = "Chronic Pain") +
+  annotate("text", x = min(merged_park$`avg_Max AQI`), y = max(merged_park$percent_chronic_pain) - 40,
+           label = park_p_value_annotation,
+           hjust = 0, vjust = 1, size = 4, color = "red") + theme_minimal() +
+  theme(plot.title = element_text(size = 30), 
+        axis.title = element_text(size = 25), 
+        axis.text = element_text(size = 25))
+
+```
+
+# Recreation Center
+```{r}
+
+aggregated_rec <- aggregated_pain_rec %>%
+  rename(state = fipsst)
+merged_rec <- merge(maqi_state_averages, aggregated_rec)
+merged_rec <- merged_rec %>%
+  mutate(k10q13 = as.factor(k10q13))
+
+model_rec <- lm(percent_chronic_pain ~ `avg_Max AQI`, data = merged_rec)
+summary_rec <- summary(model_rec)
+print(summary_rec)
+
+merged_rec$k10q13 <- relevel(merged_rec$k10q13, ref = "No valid response")
+
+# Extended model with recreational center access
+model_rec2 <- lm(percent_chronic_pain ~ `avg_Max AQI` + k10q13, data = merged_rec)
+summary_rec2 <- summary(model_rec2)
+print(summary_rec2)
+
+# Compare coefficients of avg_Max AQI
+coef_rec <- summary_rec$coefficients["`avg_Max AQI`", ]
+coef_rec2 <- summary_rec2$coefficients["`avg_Max AQI`", ]
+
+p_value_rec <- coef_rec["Pr(>|t|)"]
+p_value_rec2 <- coef_rec2["Pr(>|t|)"]
+
+p_values_rectotal <- summary_rec2$coefficients[grepl("k10q13", rownames(summary_rec2$coefficients)), "Pr(>|t|)"]
+
+# Format the p-values for annotation
+rec_levels <- levels(merged_rec$k10q13)
+rec_p_value_annotation <- paste(rec_levels[-1], "p-value =", format(p_values_rectotal, digits = 3), collapse = "; ")
+
+# Plot the results
+ggplot(merged_rec, aes(x = `avg_Max AQI`, y = percent_chronic_pain, color = k10q13)) +
+  geom_point() +
+  geom_smooth(method = "lm", se = FALSE) +
+  labs(title = "Regression of Chronic Pain on Max AQI with Recreaction Center Presence Covariate",
+       x = "Max AQI",
+       y = "Chronic Pain") +
+  annotate("text", x = min(merged_rec$`avg_Max AQI`), y = max(merged_rec$percent_chronic_pain) - 40,
+           label = rec_p_value_annotation,
+           hjust = 0, vjust = 1, size = 4, color = "red") + theme_minimal() +
+  theme(plot.title = element_text(size = 30), 
+        axis.title = element_text(size = 25), 
+        axis.text = element_text(size = 25))
+
+```
+
+# Litter
+```{r}
+
+aggregated_lit <- aggregated_pain_lit %>%
+  rename(state = fipsst)
+merged_lit <- merge(maqi_state_averages, aggregated_lit)
+merged_lit <- merged_lit %>%
+  mutate(litter_22 = as.factor(litter_22))
+
+model_lit <- lm(percent_chronic_pain ~ `avg_Max AQI`, data = merged_lit)
+summary_lit <- summary(model_lit)
+print(summary_lit)
+
+merged_lit$litter_22 <- relevel(merged_lit$litter_22, ref = "Missing")
+
+# Extended model with neighborhoods with litter
+model_lit2 <- lm(percent_chronic_pain ~ `avg_Max AQI` + litter_22, data = merged_lit)
+summary_lit2 <- summary(model_lit2)
+print(summary_lit2)
+
+# Compare coefficients of avg_Max AQI
+coef_lit <- summary_lit$coefficients["`avg_Max AQI`", ]
+coef_lit2 <- summary_lit2$coefficients["`avg_Max AQI`", ]
+
+p_value_lit <- coef_lit["Pr(>|t|)"]
+p_value_lit2 <- coef_lit2["Pr(>|t|)"]
+
+p_values_littotal <- summary_lit2$coefficients[grepl("litter_22", rownames(summary_lit2$coefficients)), "Pr(>|t|)"]
+
+# Format the p-values for annotation
+lit_levels <- levels(merged_lit$litter_22)
+lit_p_value_annotation <- paste(lit_levels[-1], "p-value =", format(p_values_littotal, digits = 3), collapse = "; ")
+
+# Plot the results
+ggplot(merged_lit, aes(x = `avg_Max AQI`, y = percent_chronic_pain, color = litter_22)) +
+  geom_point() +
+  geom_smooth(method = "lm", se = FALSE) +
+  labs(title = "Regression of Chronic Pain on Max AQI with Neighborhood Litter Covariate",
+       x = "Max AQI",
+       y = "Chronic Pain") +
+  annotate("text", x = min(merged_lit$`avg_Max AQI`), y = max(merged_lit$percent_chronic_pain) - 40,
+           label = lit_p_value_annotation,
+           hjust = 0, vjust = 1, size = 4, color = "red") + theme_minimal() +
+  theme(plot.title = element_text(size = 30), 
+        axis.title = element_text(size = 25), 
+        axis.text = element_text(size = 25))
+
+```
+
+
+# Number of ER Visits
+```{r}
+aggregated_er <- aggregated_pain_er %>%
+  rename(state = fipsst)
+merged_er <- merge(maqi_state_averages, aggregated_er)
+merged_er <- merged_er %>%
+  mutate(ERVisit_22 = as.factor(ERVisit_22))
+
+model_er <- lm(percent_chronic_pain ~ `avg_Max AQI`, data = merged_er)
+summary_er <- summary(model_er)
+print(summary_er)
+
+merged_er$ERVisit_22 <- relevel(merged_er$ERVisit_22, ref = "Missing")
+
+# Extended model
+model_er2 <- lm(percent_chronic_pain ~ `avg_Max AQI` + ERVisit_22, data = merged_er)
+summary_er2 <- summary(model_er2)
+print(summary_er2)
+
+# Compare coefficients of avg_Max AQI
+coef_er <- summary_er$coefficients["`avg_Max AQI`", ]
+coef_er2 <- summary_er2$coefficients["`avg_Max AQI`", ]
+
+p_value_er <- coef_er["Pr(>|t|)"]
+p_value_er2 <- coef_er2["Pr(>|t|)"]
+
+p_values_ertotal <- summary_er2$coefficients[grepl("ERVisit_22", rownames(summary_er2$coefficients)), "Pr(>|t|)"]
+
+# Format the p-values for annotation
+er_levels <- levels(merged_er$ERVisit_22)
+er_p_value_annotation <- paste(er_levels[-1], "p-value =", format(p_values_ertotal, digits = 3), collapse = "; ")
+
+# Plot the results
+ggplot(merged_er, aes(x = `avg_Max AQI`, y = percent_chronic_pain, color = ERVisit_22)) +
+  geom_point() +
+  geom_smooth(method = "lm", se = FALSE) +
+  labs(title = "Regression of Chronic Pain on Max AQI with Number of ER Visits Covariate",
+       x = "Max AQI",
+       y = "Chronic Pain") +
+  annotate("text", x = min(merged_er$`avg_Max AQI`), y = max(merged_er$percent_chronic_pain) - 40,
+           label = er_p_value_annotation,
+           hjust = 0, vjust = 1, size = 4, color = "red") + theme_minimal() +
+  theme(plot.title = element_text(size = 30), 
+        axis.title = element_text(size = 25), 
+        axis.text = element_text(size = 25))
+
+```
+
+# Recieved Medical Care
+```{r}
+aggregated_med <- aggregated_pain_med %>%
+  rename(state = fipsst)
+merged_med <- merge(maqi_state_averages, aggregated_med)
+merged_med <- merged_med %>%
+  mutate(MedCare_22 = as.factor(MedCare_22))
+
+model_med <- lm(percent_chronic_pain ~ `avg_Max AQI`, data = merged_med)
+summary_med <- summary(model_med)
+print(summary_med)
+
+merged_med$MedCare_22 <- relevel(merged_med$MedCare_22, ref = "Yes")
+
+# Extended model
+model_med2 <- lm(percent_chronic_pain ~ `avg_Max AQI` + MedCare_22, data = merged_med)
+summary_med2 <- summary(model_med2)
+print(summary_med2)
+
+# Compare coefficients of avg_Max AQI
+coef_med <- summary_med$coefficients["`avg_Max AQI`", ]
+coef_med2 <- summary_med2$coefficients["`avg_Max AQI`", ]
+
+p_value_med <- coef_med["Pr(>|t|)"]
+p_value_med2 <- coef_med2["Pr(>|t|)"]
+
+p_values_medtotal <- summary_med2$coefficients[grepl("MedCare_22", rownames(summary_med2$coefficients)), "Pr(>|t|)"]
+
+# Format the p-values for annotation
+med_levels <- levels(merged_med$MedCare_22)
+med_p_value_annotation <- paste(med_levels[-1], "p-value =", format(p_values_medtotal, digits = 3), collapse = "; ")
+
+# Plot the results
+ggplot(merged_med, aes(x = `avg_Max AQI`, y = percent_chronic_pain, color = MedCare_22)) +
+  geom_point() +
+  geom_smooth(method = "lm", se = FALSE) +
+  labs(title = "Regression of Chronic Pain on Max AQI with Medical Care Over 12 Months Covariate",
+       x = "Max AQI",
+       y = "Chronic Pain") +
+  annotate("text", x = min(merged_med$`avg_Max AQI`), y = max(merged_med$percent_chronic_pain) - 40,
+           label = med_p_value_annotation,
+           hjust = 0, vjust = 1, size = 4, color = "red") + theme_minimal() +
+  theme(plot.title = element_text(size = 30), 
+        axis.title = element_text(size = 25), 
+        axis.text = element_text(size = 25))
+
+```
+
+# Coping with emotional, mental, developmental problems, etc
+```{r}
+aggregated_mhn <- aggregated_pain_mhn %>%
+  rename(state = fipsst)
+merged_mhn <- merge(maqi_state_averages, aggregated_mhn)
+merged_mhn <- merged_mhn %>%
+  mutate(mhneeds_22 = as.factor(mhneeds_22))
+
+model_mhn <- lm(percent_chronic_pain ~ `avg_Max AQI`, data = merged_mhn)
+summary_mhn <- summary(model_mhn)
+print(summary_mhn)
+
+merged_mhn$mhneeds_22 <- relevel(merged_mhn$mhneeds_22, ref = "CSHCN NOT qualifying on EBD criteria")
+
+# Extended model
+model_mhn2 <- lm(percent_chronic_pain ~ `avg_Max AQI` + mhneeds_22, data = merged_mhn)
+summary_mhn2 <- summary(model_mhn2)
+print(summary_mhn2)
+
+# Compare coefficients of avg_Max AQI
+coef_mhn <- summary_mhn$coefficients["`avg_Max AQI`", ]
+coef_mhn2 <- summary_mhn2$coefficients["`avg_Max AQI`", ]
+
+p_value_mhn <- coef_mhn["Pr(>|t|)"]
+p_value_mhn2 <- coef_mhn2["Pr(>|t|)"]
+
+p_values_mhntotal <- summary_mhn2$coefficients[grepl("mhneeds_22", rownames(summary_mhn2$coefficients)), "Pr(>|t|)"]
+
+# Format the p-values for annotation
+mhn_levels <- levels(merged_mhn$mhneeds_22)
+mhn_p_value_annotation <- paste(mhn_levels[-1], "p-value =", format(p_values_mhntotal, digits = 3), collapse = "; ")
+
+# Plot the results
+ggplot(merged_mhn, aes(x = `avg_Max AQI`, y = percent_chronic_pain, color = mhneeds_22)) +
+  geom_point() +
+  geom_smooth(method = "lm", se = FALSE) +
+  labs(title = "Regression of Chronic Pain on Max AQI with MEDB Problems Covariate",
+       x = "Max AQI",
+       y = "Chronic Pain") +
+  annotate("text", x = min(merged_mhn$`avg_Max AQI`), y = max(merged_mhn$percent_chronic_pain) - 40,
+           label = mhn_p_value_annotation,
+           hjust = 0, vjust = 1, size = 4, color = "red") + theme_minimal() +
+  theme(plot.title = element_text(size = 30), 
+        axis.title = element_text(size = 25), 
+        axis.text = element_text(size = 25))
+
+```
+
+# Recieved Mental Health Care
+```{r}
+aggregated_mh <- aggregated_pain_mh %>%
+  rename(state = fipsst)
+merged_mh <- merge(maqi_state_averages, aggregated_mh)
+merged_mh <- merged_mh %>%
+  mutate(MentHCare_22 = as.factor(MentHCare_22))
+
+model_mh <- lm(percent_chronic_pain ~ `avg_Max AQI`, data = merged_mh)
+summary_mh <- summary(model_mh)
+print(summary_mh)
+
+merged_mh$MentHCare_22 <- relevel(merged_mh$MentHCare_22, ref = "Missing")
+
+# Extended model
+model_mh2 <- lm(percent_chronic_pain ~ `avg_Max AQI` + MentHCare_22, data = merged_mh)
+summary_mh2 <- summary(model_mh2)
+print(summary_mh2)
+
+# Compare coefficients of avg_Max AQI
+coef_mh <- summary_mh$coefficients["`avg_Max AQI`", ]
+coef_mh2 <- summary_mh2$coefficients["`avg_Max AQI`", ]
+
+p_value_mh <- coef_mh["Pr(>|t|)"]
+p_value_mh2 <- coef_mh2["Pr(>|t|)"]
+
+p_values_mhtotal <- summary_mh2$coefficients[grepl("MentHCare_22", rownames(summary_mh2$coefficients)), "Pr(>|t|)"]
+
+# Format the p-values for annotation
+mh_levels <- levels(merged_mh$MentHCare_22)
+mh_p_value_annotation <- paste(mh_levels[-1], "p-value =", format(p_values_mhtotal, digits = 3), collapse = "; ")
+
+# Plot the results
+ggplot(merged_mh, aes(x = `avg_Max AQI`, y = percent_chronic_pain, color = MentHCare_22)) +
+  geom_point() +
+  geom_smooth(method = "lm", se = FALSE) +
+  labs(title = "Regression of Chronic Pain on Max AQI with Mental Health Care Over 12 Months Covariate",
+       x = "Max AQI",
+       y = "Chronic Pain") +
+  annotate("text", x = min(merged_mh$`avg_Max AQI`), y = max(merged_mh$percent_chronic_pain) - 40,
+           label = mh_p_value_annotation,
+           hjust = 0, vjust = 1, size = 4, color = "red") + theme_minimal() +
+  theme(plot.title = element_text(size = 30), 
+        axis.title = element_text(size = 25), 
+        axis.text = element_text(size = 25))
+
+```
+
+# Recieved Preventative Medicine care 
+```{r}
+aggregated_pmh <- aggregated_pain_pmh %>%
+  rename(state = fipsst)
+merged_pmh <- merge(maqi_state_averages, aggregated_pmh)
+merged_pmh <- merged_pmh %>%
+  mutate(PrevMed_22 = as.factor(PrevMed_22))
+
+model_pmh <- lm(percent_chronic_pain ~ `avg_Max AQI`, data = merged_pmh)
+summary_pmh <- summary(model_pmh)
+print(summary_pmh)
+
+merged_pmh$PrevMed_22 <- relevel(merged_pmh$PrevMed_22, ref = "None")
+
+# Extended model
+model_pmh2 <- lm(percent_chronic_pain ~ `avg_Max AQI` + PrevMed_22, data = merged_pmh)
+summary_pmh2 <- summary(model_pmh2)
+print(summary_pmh2)
+
+# Compare coefficients of avg_Max AQI
+coef_pmh <- summary_pmh$coefficients["`avg_Max AQI`", ]
+coef_pmh2 <- summary_pmh2$coefficients["`avg_Max AQI`", ]
+
+p_value_pmh <- coef_pmh["Pr(>|t|)"]
+p_value_pmh2 <- coef_pmh2["Pr(>|t|)"]
+
+p_values_pmhtotal <- summary_pmh2$coefficients[grepl("PrevMed_22", rownames(summary_pmh2$coefficients)), "Pr(>|t|)"]
+
+# Format the p-values for annotation
+pmh_levels <- levels(merged_pmh$PrevMed_22)
+pmh_p_value_annotation <- paste(pmh_levels[-1], "p-value =", format(p_values_pmhtotal, digits = 3), collapse = "; ")
+
+# Plot the results
+ggplot(merged_pmh, aes(x = `avg_Max AQI`, y = percent_chronic_pain, color = PrevMed_22)) +
+  geom_point() +
+  geom_smooth(method = "lm", se = FALSE) +
+  labs(title = "Regression of Chronic Pain on Max AQI with Preventative Care Over 12 Months Covariate",
+       x = "Max AQI",
+       y = "Chronic Pain") +
+  annotate("text", x = min(merged_pmh$`avg_Max AQI`), y = max(merged_pmh$percent_chronic_pain) - 40,
+           label = pmh_p_value_annotation,
+           hjust = 0, vjust = 1, size = 4, color = "red") + theme_minimal() +
+  theme(plot.title = element_text(size = 30), 
+        axis.title = element_text(size = 25), 
+        axis.text = element_text(size = 25))
+
+
+```
+
+# Difficulty Obtaining Mental Health Care
+```{r}
+aggregated_mhd <- aggregated_pain_mhd %>%
+  rename(state = fipsst)
+merged_mhd <- merge(maqi_state_averages, aggregated_mhd)
+merged_mhd <- merged_mhd %>%
+  mutate(MentHDiff_22 = as.factor(MentHDiff_22))
+
+model_mhd <- lm(percent_chronic_pain ~ `avg_Max AQI`, data = merged_mhd)
+summary_mhd <- summary(model_mhd)
+print(summary_mhd)
+
+merged_mhd$MentHDiff_22 <- relevel(merged_mhd$MentHDiff_22, ref = "Did not have difficulty")
+
+# Extended model
+model_mhd2 <- lm(percent_chronic_pain ~ `avg_Max AQI` + MentHDiff_22, data = merged_mhd)
+summary_mhd2 <- summary(model_mhd2)
+print(summary_mhd2)
+
+# Compare coefficients of avg_Max AQI
+coef_mhd <- summary_mhd$coefficients["`avg_Max AQI`", ]
+coef_mhd2 <- summary_mhd2$coefficients["`avg_Max AQI`", ]
+
+p_value_mhd <- coef_mhd["Pr(>|t|)"]
+p_value_mhd2 <- coef_mhd2["Pr(>|t|)"]
+
+p_values_mhdtotal <- summary_mhd2$coefficients[grepl("MentHDiff_22", rownames(summary_mhd2$coefficients)), "Pr(>|t|)"]
+
+# Format the p-values for annotation
+mhd_levels <- levels(merged_mhd$MentHDiff_22)
+mhd_p_value_annotation <- paste(mhd_levels[-1], "p-value =", format(p_values_mhdtotal, digits = 3), collapse = "; ")
+
+# Plot the results
+ggplot(merged_mhd, aes(x = `avg_Max AQI`, y = percent_chronic_pain, color = MentHDiff_22)) +
+  geom_point() +
+  geom_smooth(method = "lm", se = FALSE) +
+  labs(title = "Regression of Chronic Pain on Max AQI with Mental Health Care Difficulty Covariate",
+       x = "Max AQI",
+       y = "Chronic Pain") +
+  annotate("text", x = min(merged_mhd$`avg_Max AQI`), y = max(merged_mhd$percent_chronic_pain) - 40,
+           label = mhd_p_value_annotation,
+           hjust = 0, vjust = 1, size = 4, color = "red") + theme_minimal() +
+  theme(plot.title = element_text(size = 30), 
+        axis.title = element_text(size = 25), 
+        axis.text = element_text(size = 25))
+
+```
+
+# ACEs: Neighborhood Violence
+```{r}
+aggregated_ACE <- aggregated_pain_ACE %>%
+  rename(state = fipsst)
+merged_ACE <- merge(maqi_state_averages, aggregated_ACE)
+merged_ACE <- merged_ACE %>%
+  mutate(ACEneighviol_22 = as.factor(ACEneighviol_22))
+
+model_ACE <- lm(percent_chronic_pain ~ `avg_Max AQI`, data = merged_ACE)
+summary_ACE <- summary(model_ACE)
+print(summary_ACE)
+
+merged_ACE$ACEneighviol_22 <- relevel(merged_ACE$ACEneighviol_22, ref = "No")
+
+# Extended model
+model_ACE2 <- lm(percent_chronic_pain ~ `avg_Max AQI` + ACEneighviol_22, data = merged_ACE)
+summary_ACE2 <- summary(model_ACE2)
+print(summary_ACE2)
+
+# Compare coefficients of avg_Max AQI
+coef_ACE <- summary_ACE$coefficients["`avg_Max AQI`", ]
+coef_ACE2 <- summary_ACE2$coefficients["`avg_Max AQI`", ]
+
+p_value_ACE <- coef_ACE["Pr(>|t|)"]
+p_value_ACE2 <- coef_ACE2["Pr(>|t|)"]
+
+p_values_ACEtotal <- summary_ACE2$coefficients[grepl("ACENeighviol_22", rownames(summary_ACE2$coefficients)), "Pr(>|t|)"]
+
+# Format the p-values for annotation
+ACE_levels <- levels(merged_ACE$ACEneighviol_22)
+ACE_p_value_annotation <- paste(ACE_levels[-1], "p-value =", format(p_values_ACEtotal, digits = 3), collapse = "; ")
+
+# Plot the results
+ggplot(merged_ACE, aes(x = `avg_Max AQI`, y = percent_chronic_pain, color = ACEneighviol_22)) +
+  geom_point() +
+  geom_smooth(method = "lm", se = FALSE) +
+  labs(title = "Regression of Chronic Pain on Max AQI with ACE: Exposure to Neighborhood Violence Covariate",
+       x = "Max AQI",
+       y = "Chronic Pain") +
+  annotate("text", x = min(merged_ACE$`avg_Max AQI`), y = max(merged_ACE$percent_chronic_pain) - 40,
+           label = ACE_p_value_annotation,
+           hjust = 0, vjust = 1, size = 4, color = "red") + theme_minimal() +
+  theme(plot.title = element_text(size = 30), 
+        axis.title = element_text(size = 25), 
+        axis.text = element_text(size = 25))
+
+
+```
+
+# Anxiety
+```{r}
+aggregated_AX <- aggregated_pain_AX %>%
+  rename(state = fipsst)
+merged_AX <- merge(maqi_state_averages, aggregated_AX)
+merged_AX <- merged_AX %>%
+  mutate(anxiety_22 = as.factor(anxiety_22))
+
+model_AX <- lm(percent_chronic_pain ~ `avg_Max AQI`, data = merged_AX)
+summary_AX <- summary(model_AX)
+print(summary_AX)
+
+merged_AX$anxiety_22 <- relevel(merged_AX$anxiety_22, ref = "Do not have condition")
+
+# Extended model
+model_AX2 <- lm(percent_chronic_pain ~ `avg_Max AQI` + anxiety_22, data = merged_AX)
+summary_AX2 <- summary(model_AX2)
+print(summary_AX2)
+
+# Compare coefficients of avg_Max AQI
+coef_AX <- summary_AX$coefficients["`avg_Max AQI`", ]
+coef_AX2 <- summary_AX2$coefficients["`avg_Max AQI`", ]
+
+p_value_AX <- coef_AX["Pr(>|t|)"]
+p_value_AX2 <- coef_AX2["Pr(>|t|)"]
+
+p_values_AXtotal <- summary_AX2$coefficients[grepl("anxiety_22", rownames(summary_AX2$coefficients)), "Pr(>|t|)"]
+
+# Format the p-values for annotation
+AX_levels <- levels(merged_AX$anxiety_22)
+AX_p_value_annotation <- paste(AX_levels[-1], "p-value =", format(p_values_AXtotal, digits = 3), collapse = "; ")
+
+# Plot the results
+ggplot(merged_AX, aes(x = `avg_Max AQI`, y = percent_chronic_pain, color = anxiety_22)) +
+  geom_point() +
+  geom_smooth(method = "lm", se = FALSE) +
+  labs(title = "Regression of Chronic Pain on Max AQI with Anxiety Covariate",
+       x = "Max AQI",
+       y = "Chronic Pain") +
+  annotate("text", x = min(merged_AX$`avg_Max AQI`), y = max(merged_AX$percent_chronic_pain) - 40,
+           label = AX_p_value_annotation,
+           hjust = 0, vjust = 1, size = 4, color = "red") + theme_minimal() +
+  theme(plot.title = element_text(size = 30), 
+        axis.title = element_text(size = 25), 
+        axis.text = element_text(size = 25))
+
+```
+
+# Depression
+```{r}
+aggregated_d <- aggregated_pain_d %>%
+  rename(state = fipsst)
+merged_d <- merge(maqi_state_averages, aggregated_d)
+merged_d <- merged_d %>%
+  mutate(depress_22 = as.factor(depress_22))
+
+model_d <- lm(percent_chronic_pain ~ `avg_Max AQI`, data = merged_d)
+summary_d <- summary(model_d)
+print(summary_d)
+
+merged_d$depress_22 <- relevel(merged_d$depress_22, ref = "Do not have condition")
+
+# Extended model
+model_d2 <- lm(percent_chronic_pain ~ `avg_Max AQI` + depress_22, data = merged_d)
+summary_d2 <- summary(model_d2)
+print(summary_d2)
+
+# Compare coefficients of avg_Max AQI
+coef_d <- summary_d$coefficients["`avg_Max AQI`", ]
+coef_d2 <- summary_d2$coefficients["`avg_Max AQI`", ]
+
+p_value_d <- coef_d["Pr(>|t|)"]
+p_value_d2 <- coef_d2["Pr(>|t|)"]
+
+p_values_dtotal <- summary_d2$coefficients[grepl("depress_22", rownames(summary_d2$coefficients)), "Pr(>|t|)"]
+
+# Format the p-values for annotation
+d_levels <- levels(merged_d$depress_22)
+d_p_value_annotation <- paste(d_levels[-1], "p-value =", format(p_values_dtotal, digits = 3), collapse = "; ")
+
+# Plot the results
+ggplot(merged_d, aes(x = `avg_Max AQI`, y = percent_chronic_pain, color = depress_22)) +
+  geom_point() +
+  geom_smooth(method = "lm", se = FALSE) +
+  labs(title = "Regression of Chronic Pain on Max AQI with Depression Covariate",
+       x = "Max AQI",
+       y = "Chronic Pain") +
+  annotate("text", x = min(merged_d$`avg_Max AQI`), y = max(merged_d$percent_chronic_pain) - 40,
+           label = d_p_value_annotation,
+           hjust = 0, vjust = 1, size = 4, color = "red") + theme_minimal() +
+  theme(plot.title = element_text(size = 30), 
+        axis.title = element_text(size = 25), 
+        axis.text = element_text(size = 25))
+
+
+```
+
+# ADHD/ADD
+```{r}
+aggregated_A <- aggregated_pain_A %>%
+  rename(state = fipsst)
+merged_A <- merge(maqi_state_averages, aggregated_A)
+merged_A <- merged_A %>%
+  mutate(ADHDind_22 = as.factor(ADHDind_22))
+
+model_A <- lm(percent_chronic_pain ~ `avg_Max AQI`, data = merged_A)
+summary_A <- summary(model_A)
+print(summary_A)
+
+merged_A$ADHDind_22 <- relevel(merged_A$ADHDind_22, ref = "Missing")
+
+# Extended model
+model_A2 <- lm(percent_chronic_pain ~ `avg_Max AQI` + ADHDind_22, data = merged_A)
+summary_A2 <- summary(model_A2)
+print(summary_A)
+
+# Compare coefficients of avg_Max AQI
+coef_A <- summary_A$coefficients["`avg_Max AQI`", ]
+coef_A2 <- summary_A2$coefficients["`avg_Max AQI`", ]
+
+p_value_A <- coef_A["Pr(>|t|)"]
+p_value_A2 <- coef_A2["Pr(>|t|)"]
+
+p_values_Atotal <- summary_A2$coefficients[grepl("ADHDind_22", rownames(summary_A2$coefficients)), "Pr(>|t|)"]
+
+# Format the p-values for annotation
+A_levels <- levels(merged_A$ADHDind_22)
+A_p_value_annotation <- paste(A_levels[-1], "p-value =", format(p_values_Atotal, digits = 3), collapse = "; ")
+
+# Plot the results
+ggplot(merged_A, aes(x = `avg_Max AQI`, y = percent_chronic_pain, color = ADHDind_22)) +
+  geom_point() +
+  geom_smooth(method = "lm", se = FALSE) +
+  labs(title = "Regression of Chronic Pain on Max AQI with ADHD Covariate",
+       x = "Max AQI",
+       y = "Chronic Pain") +
+  annotate("text", x = min(merged_A$`avg_Max AQI`), y = max(merged_A$percent_chronic_pain) - 40,
+           label = A_p_value_annotation,
+           hjust = 0, vjust = 1, size = 4, color = "red") + theme_minimal() +
+  theme(plot.title = element_text(size = 30), 
+        axis.title = element_text(size = 25), 
+        axis.text = element_text(size = 25))
+
+```

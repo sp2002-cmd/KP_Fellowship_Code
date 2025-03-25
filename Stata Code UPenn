@@ -1,0 +1,1104 @@
+//Set working directory
+cd "C:\Users\Sebastian Pintea\OneDrive\Documents\UCSP 2023\STATA"
+
+import excel "C:\Users\Sebastian Pintea\OneDrive\Documents\UCSP 2023\STATA\UCSP_In Class lab 5_Table 1.xlsx", sheet("Sheet1") firstrow clear
+
+br
+
+//Dichotomize age (age < 40 & age >= 40), young age = 0, old age = 1, 0 = unexposed and 1 = exposed
+
+sum
+gen Age_Di = 1 if Age >= 40 & Age != .
+replace Age_Di = 0 if Age < 40
+
+gen Disease = 1 if disease == "YES" & disease != ""
+replace Disease = 0 if disease == "NO"
+tab Disease Coffee
+
+//Crude Odds Ratio
+cc Disease Coffee //1.346
+logistic Disease Coffee //1.346
+
+//2b. Is age associated with coffee consumption?
+regress Age_Di Coffee //Yes
+cc Age_Di Coffee
+
+//2c. Is age associated with disease?
+regress Disease Age_Di //No
+cc Age_Di Disease
+
+//2d. Is age a potential confounder of the coffee drinking association?
+cc Disease Coffee //Yes
+cc Disease Age_Di
+cc Age_Di Coffee
+
+//2e. Cohort study recalculation
+cs Disease Coffee
+cs Disease Age_Di 
+
+//2g. Calculate relative risk of disease associated with coffee stratified by age
+tab Coffee Disease if Age_Di == 1 //RR = 1.26
+tab Coffee Disease if Age_Di == 0 //RR = 1.26
+cs Disease Coffee, by(Age_Di)
+
+//2h. Calculate age adjusted relative risk during direct method using total population as the standard
+cs Disease Coffee, by(Age_Di)
+
+//3b. Is smoking associated with coffee consumption?
+cc Coffee Smoke //Yes, OR = 2.5
+tab Smoke Coffee
+
+//3c. Is smoking associated with disease?
+cc Smoke Disease //Yes, OR = 4
+tab Smoke Disease
+
+//3d. Calculate relative risk of disease associated with coffee consumption stratified by cigarette smoking
+cs Disease Coffee, by(Smoke)
+tab Coffee Disease if Smoke == 1 //RR = 1
+tab Coffee Disease if Smoke == 0 //RR = 1
+
+//3e. Calculate smoking adjusted relative risk during direct method using total population as the standard
+cs Disease Coffee, by(Smoke)
+
+```````
+***Lab #2 Do-File***
+
+clear
+sysuse auto.dta
+
+//Browse data/describe
+br
+describe
+
+//Evaluate normality of continous variables 
+hist price //right skewed
+hist mpg //right skewed
+hist weight, normal //let's say this is normal-ish
+sktest weight
+
+//Compute descriptive statistics for price, mpg, and weight for foreign v. domestic
+
+summarize price
+summarize price mpg weight
+
+summarize price mpg weight if foreign == 0 //domestic
+summarize price mpg weight if foreign == 1 //foreign
+bysort foreign: sum price mpg weight
+
+tab foreign
+
+bysort foreign: sum price, det
+
+sktest price
+
+//Visualizations
+scatter price weight
+scatter price weight, title("Price vs. Weight by Car Origin") ytitle("Price ($)") xtitle("Weight (pounds)")
+scatter price weight, by(foreign)
+
+hist price, by(foreign)
+
+graph box price, by(foreign)
+graph bar price, by(foreign)
+
+
+***Set working directory***
+
+***Using the ldw.dta dataset
+
+use "C:\Users\Sebastian Pintea\OneDrive\Documents\UCSP 2023\lbw.dta"
+
+br 
+
+***Create histograms of maternal age and birth weight. Are they normally distributed?***
+
+hist bwt, normal //normal
+hist age, normal //right skewed
+
+***What is the median age of the cohort***
+summarize age, detail //Median age is 23
+
+***How many women had hypertension?***
+tabulate ht //12
+
+***What is the median age by hypertension status?***
+bysort ht: sum age, det //22
+
+***What is the median birthweight by htn and smoking status? Create box plots***
+bysort ht smoke: sum bwt, det //2495
+graph box bwt, by(ht smoke) //or
+graph box bwt, by(smoke)
+graph box bwt, by(ht)
+
+***What is the frquency of smokers by race***
+bysort race: tabulate smoke
+tab race smoke, row
+tab race smoke, col
+tab race smoke, cell
+
+
+***Set working directory***
+
+***Using the hospital.dta dataset
+
+use "C:\Users\Sebastian Pintea\OneDrive\Documents\UCSP 2023\hospital.dta", clear
+br
+
+//Label the data
+
+label define sex_lbl 1 "Male" 2 "Female"
+label value sex sex_lbl
+tab sex
+
+//Service --> 1 = medicine, 2 --> surgery
+//Antibiotics --> 2 = yes, 1 = no
+
+label define service_lbl 1 "Medicine" 2 "Surgery"
+label value service service_lbl
+tab service
+
+label define antibio_lbl 1 "No" 2 "Yes"
+label value antibio antibio_lbl
+tab antibio
+
+label variable service "Hospital Service" //names the variable
+label variable sex "Patient Sex"
+label variable wbc "White Blood Cell Count"
+
+desc
+
+scatter dur_stay wbc
+label variable dur_stay "Duration of Hospitalization"
+scatter dur_stay wbc
+
+
+***Set working directory***
+
+***Using the hospital.dta dataset
+
+use "C:\Users\Sebastian Pintea\OneDrive\Documents\UCSP 2023\summary_data_100_hospitals.dta", clear
+br
+
+//Generate variables corresponding to upper and lower 95% CI 1.96
+
+gen upper_ci = mean_BMI + 1.96 * SD_BMI/sqrt(500)
+
+gen lower_ci = mean_BMI - 1.96 * SD_BMI/sqrt(500)
+
+//Create variable --> width of CI
+//Visualize relationship between SD and the CI width
+
+gen width_ci = upper_ci - lower_ci
+
+scatter width_ci SD_BMI
+
+hist mean_BMI, normal
+
+//Create a new variable hi_bmi if greater than/or equal to BMI of all hospitals
+
+sum mean_BMI
+
+gen hi_bmi = 1 if mean_BMI > 23.99678
+replace hi_bmi = 0 if mean_BMI <= 23.99678
+
+br
+
+```````
+***Set working directory***
+
+use "C:\Users\Sebastian Pintea\OneDrive\Documents\UCSP 2023\wounds.dta" 
+br
+
+***Label race categories: 1 "White" 2 "Black" 3 "Other"
+
+label define race_lbl 1 "White" 2 "Black" 3 "Other"
+label value race race_lbl
+tab race
+
+***What proportion of pts were observed to have their wounds healed by 20 wks?
+
+tab heal_20 //192 out of 586 (32.76%)
+
+***Create a table comparing characteristics (age, sex, race, HvA1c, ulcer duration, and baseline ulcer area) of patients whose ulcer did vs. did not heal by 20 weeks
+
+//Check for normality
+hist age, normal
+hist hba1c, normal
+hist basedur, normal
+hist basearea, normal 
+
+//Calculate appropriate descriptive statistics
+bysort heal_20: sum age
+bysort heal_20: sum hba1c basedur basearea, det
+
+bysort heal_20: tab race
+tab race heal_20, row
+
+ssc install table1
+help table1
+
+label define heal_20_lbl 0 "Not Healed" 1 "Healed"
+label value heal_20 heal_20_lbl
+
+table1, by(heal_20) vars(age contn \ hba1c conts \ race cat \ basedur conts \ basearea conts) onecol format(%3.1f) saving(table1.xls)
+test
+
+***Generate a new variable called "age_cat" that has 3 categories: 1=25-40 years, 2=41-55 years, 3= >55 years
+
+gen age_cat = 1 if age >= 25 & age <=40
+replace age_cat = 2 if age >= 41 & age <= 55
+replace age_cat = 3 if age > 55 & age != .
+
+br
+
+***Create box plots comparing hemoglobin A1C results for each of the above age categories
+
+graph box hba1c, by(age_cat)
+
+//Alternative way to categorize
+recode age (25/40 = 1) (40.01/55 = 2) (55.01/max = 3), gen(age_cat2)
+tab age_cat age_cat2//used to check your tables match
+
+recode age (25/40 = 1 "25-40") (40.01/55 = 2 "40-55") (55.01/max = 3 "55+"), gen(age_cat3)
+
+br
+
+
+***Appending and merging***
+cd "C:\Users\Sebastian Pintea\OneDrive\Documents\UCSP 2023"
+
+use dataset1.dta, clear
+use append_dataset.dta, clear
+
+//Start with "master" dataset
+use dataset1.dta, clear
+
+append using append_dataset.dta
+
+save appended.dta, replace
+
+//Now we want to merge additional variables
+
+use appended.dta, clear //"master"
+merge 1:1 id using set2formerge.dta //merge the "using"
+drop _merge
+
+use set2formerge.dta, clear//not necessary for merge, this is just to see what the data looks like
+br
+
+
+***T-Test Examples
+display sqrt(1.789) //1.337535
+di sqrt(2.456) //1.567163
+
+sysuse cancer.dta, clear
+br
+
+//Check normality
+hist age, normal
+sktest age // we will assume normality for now
+
+//Check variance equality
+sdtest age, by(died)
+
+//Perform T-Test
+ttest age, by(died)
+//ttest age, by(died) unequal // we actually have eqaulity of variances
+
+````````
+***Set working directory***
+
+cd "C:\Users\Sebastian Pintea\OneDrive\Documents\UCSP 2023"
+clear
+
+//Append drug2 and drug1 dataset
+
+use drug1_dataset.dta
+use drug2_dataset.dta
+br
+
+append using drug2_dataset.dta
+br
+
+order bp_before bp_after
+
+//Generate variable "bmi_cat" w/ 4 categories: 1 =< 18.5; 2 = 18.5-24.9; 3 = 25-29.9; 4 =>=30
+
+gen bmi_cat = 1 if bmi <= 18.5
+replace bmi_cat = 2 if bmi > 18.5 & bmi <= 24.9
+replace bmi_cat = 3 if bmi >= 25 & bmi <= 29.9 
+replace bmi_cat = 4 if bmi >= 30 & bmi != .
+
+sort bmi // sort ascending my bmi
+order bmi bmi_cat //double check coding looks good
+
+//Label the categories as follows: 1 "Underweight" 2 "Healthy Weight" 3 "Overweight" 4 "Obese"
+
+label define bmi_cat_lbl 1 "Underweight" 2 "Healthy Weight" 3 "Overweight" 4  "Obese"
+label value bmi_cat bmi_cat_lbl
+tab bmi_cat
+
+//Label bmi_cat "Body Mass Index Category"
+
+label variable bmi_cat "Body Mass Index Category"
+
+//Check numerical coding
+numlabel, add // this will mandate numerical codes when tabulating
+tab sex
+numlabel, remove
+tab sex
+
+sum bp_before if sex == 1 //mean BP for females
+
+//Fill in the table comparing characteristics of pts treated with drug 1 vs drug 2
+
+hist bp_before, normal // right skewed
+
+table1, by(drug) vars(sex cat \ agegrp cat \ bmi_cat cat \ bp_before contn) onecol format(%3.1f)
+
+help table1
+
+//Determine if there is a statistical difference in mean baseline SBP between groups
+***There is not a statistical difference (fail to reject)
+sdtest bp_before, by(drug)
+
+ttest bp_before, by(drug)
+
+//Generate variable called "five_basebp" to calculate what is 5% of the baseline SBP
+
+gen five_basebp = 0.05 * bp_before
+
+//Generate variable called "bp_change" to calculate the chance in SBP afer therapy
+
+gen bp_change = bp_before - bp_after
+
+//Generate variable called "sig_bp_change." Determine cumulative incidence of significant SBP decline, by drug exposure
+
+gen sig_bp_change = 1 if bp_change > five_basebp & bp_change != .
+replace sig_bp_change = 0 if bp_change <= five_basebp
+br
+tab sig_bp_change drug, col
+
+sum bp_before if drug == 1 //mean
+ci means bp_before if drug == 1 //confidence interval
+
+
+***Load hpylori dataset***
+
+use hpylori.dta, clear
+br
+tab hp
+tab hp sex, col
+
+tab hp sex, col exact//Fischers
+tab hp sex, col chi//Chi Squared
+tab hp sex, expect//Expected value
+
+//Risk Difference= There is a 4.25%-fold increased risk of constipated associated with daily jimmy johns diet relative to a normal diet"
+//Odds ratio= P/1-P (NOT a proportion, rather you would say 4:1 for example)
+//Odds Ratio:There is a 4.25%-fold increased odds of constipated associated with daily jimmy johns diet compared to a normal diet
+//Can't do relative risk with case control, rather we will do odds ratio
+
+//Is there an association between eye color and sex
+
+tab eyecolor sex, row
+tab eyecolor sex, expect
+tab eyecolor sex, exact
+
+//Is there an association between blue eye color hplori
+
+gen blue = 1 if eyecolor == "bl"
+replace blue = 0 if eyecolor == "gr" | eyecolor == "br"
+tab blue eyecolor
+
+tab blue hp, row exact
+
+cs hp blue //RR
+
+cc hp blue //OR
+
+csi 34 12 66 88
+
+//Children attending daycare had a 2.83-fold increased risk of otitis media infection relative to those who attended school at home (RR 2.83, 95% CI 1.56-5.14, p<.0002)
+
+```````
+***Set working directory***
+cd "C:\Users\Sebastian Pintea\OneDrive\Documents\UCSP 2023"
+
+//Import dataset
+
+import excel "C:\Users\Sebastian Pintea\OneDrive\Documents\UCSP 2023\sub1_practice.xlsx", sheet("1A ADA, ASA rem") firstrow case(lower)
+sum age //need to clean the data because its a string
+
+replace age = "" if age == "null"
+destring age, replace //make sure to destring after removing non-numeric variables first
+sum age
+
+gen sex = 1 if gender == "M"
+replace sex = 0 if gender == "F"
+label define sex 0 "Female" 1 "Male"
+label value sex sex
+
+order sex
+br
+
+//
+encode gender, gen(sex2)
+order sex2
+
+encode race, gen(race2)
+order race2
+
+numlabel, add
+tab race2
+
+drop gender
+drop race
+drop sex2
+
+rename race2 race
+
+order sr_no age sex race
+
+// remove "every" from string
+replace start_dose = lower(start_dose) //make everything lowercase
+replace start_dose = subinstr(start_dose, "every", "", .)
+replace start_dose = subinstr(start_dose, "mg", "milligrams", .)
+
+tab current_drug
+
+br
+
+//We will use regular expression searches
+
+replace current_drug = lower(current_drug)
+tab current_drug
+
+gen drug = 1 if regexm(current_drug, "mira")
+replace drug = 0 if regexm(current_drug, "drug")
+
+tab drug current_drug
+
+***Input tumor data***
+clear
+
+input tumor_grp value
+1 35
+1 20
+1 15
+1 50
+1 43
+1 22
+2 754
+2 1240
+2 176
+2 66
+2 20
+2 85
+end
+
+ranksum value, by(tumor_grp) //Wilcoxon (under non parametric tests)
+ttest value, by(tumor_grp) //simialr syntax
+
+// Load example dataset
+sysuse bpwide.dta, clear
+br
+
+// Is the difference in BP different between men and women?
+gen bp_diff = bp_before - bp_after
+
+hist bp_diff //possibly normal but will choose to apply non-parametric
+
+bysort sex: sum bp_diff, det
+ranksum bp_diff, by(sex) //we have insufficient evidence to say there is a difference between these two medians
+
+bysort sex: sum bp_before, det
+ranksum bp_before , by(sex)
+
+// Signed rank test for paired data
+signrank bp_before = bp_after
+gen abs = abs(bp_diff)
+sort abs
+
+// Load dataset
+use hiv-hcv-1.dta, clear
+
+//1. Is "base_wt" normally distributed?
+hist base_wt, normal//lets do non-parametric
+sktest base_wt
+
+//2. Is the median baseline body wt different between HIV+HCV vs. HCV only pts?
+
+bysort status: sum base_wt, det
+ranksum base_wt, by(status) //data is independent, not paired so we will do rank sum
+
+//3. For HIV+HCV pts, is the median body wt at the end of HCV therapy significantly lower than the media body wt at baseline?
+
+sum base_wt if status == 1, det
+sum end_wt if status == 1, det
+
+signrank base_wt = end_wt if status == 1
+
+///Open up auto dataset
+
+sysuse auto.dta, clear
+
+scatter price weight
+hist price // right skewed
+hist weight // right skewed
+ 
+//since theyre skewed, we will use spearman not pearson
+ 
+spearman price weight
+pwcorr price weight, sig
+
+graph matrix price weight trunk
+
+//Load Dataset
+use sysage.dta, clear
+br
+
+scatter systolic age // weak, positive correlation
+
+spearman systolic age
+
+graph twoway (scatter systolic age) || (lfit systolic age)
+
+graph twoway (scatter systolic age) || (lfit systolic age), text(115 65 "r=0.46")
+
+scatter systolic age
+
+regress systolic age
+
+y = b0 + b1*x
+y= 118.69 + 0.447*age
+
+di 118.69 + 120*0.447
+///For every 1 year, a persons systolic blood pressure will increase by .447
+
+`````````
+***Set working directory***
+cd "C:\Users\Sebastian Pintea\OneDrive\Documents\UCSP 2023"
+
+use sysage.dta
+
+scatter systolic age
+regress systolic age
+
+//post-hoc
+
+predict y_hat
+predict y_hat // this is called the linear predictor (aka fitted regression line)
+
+br
+
+scatter systolic age
+graph twoway (scatter systolic age) || (scatter y_hat age)
+graph twoway (scatter systolic age) || (line y_hat age) //shows linear regression model (fitted points)
+graph twoway (scatter systolic age) || (connected y_hat age)
+
+predict e, residual
+gen diff = systolic - y_hat //same thing as line of code above 
+
+//residual plot
+
+scatter e y_hat, yline(0) // homoscedasticity is OK. No evidence of non-linearity
+
+hist e // reasonably normal distribution
+
+regress systolic age
+rvfplot, yline(0) // post-hoc
+
+//Load hpylori dataset
+
+use hpylori1.dta, clear
+
+ttest weight, by(hp)
+
+regress weight hp //you can also do a regression because our outcome is continous (weight) and our exposure is continous or categorical (hp)
+
+br
+
+encode eyecolor, gen(eye)
+tab eye
+
+regress weight i.eye //code mutli-categorical variables
+
+// Enter the following small data set into STATA
+clear
+input age weight
+10 80
+11 82
+13 85
+14 89
+end
+
+//1. Construct a scatter plot
+
+scatter weight age
+
+//2. Calculate Pearsons coefficient
+
+pwcorr weight age, sig
+
+//3. Fit a model that regresses weight on age
+
+regress weight age
+// y = 58.8 + 2.1 * age
+
+//2 by 2 table
+csi 256 167 244 333
+
+
+// Load ICU dataset
+use icu.dta, clear
+
+cc status chr_renal 
+
+// Create hi_age variable if greater than median hi_age = 1
+
+sum age, det
+gen hi_age = 1 if age > 63 & age != .
+replace hi_age = 0 if age <= 63
+
+cc status chr_renal if hi_age==0 // age is an effect modifier, not a confounder
+
+// Is the OR between renal insufficiency and death different for hi age vs. low age individuals?
+
+cc status chr_renal if hi_age == 1
+cc status chr_renal if hi_age == 0
+
+cc status chr_renal, by (hi_age) // Mantzel-Haenszel analysis
+
+tab chr_renal hi_age, chi
+tab status hi_age, chi
+
+//Infection
+cc status chr_renal, by(infection)
+di 3.386/3.0905
+
+tab chr_renal infection, chi
+tab chr_renal infection, chi
+
+cc status chr_renal, by(service)
+
+tab chr_renal service, chi
+tab status service, chi
+
+di 3.386/2.693
+
+```````
+***Set working directory***
+cd "C:\Users\Sebastian Pintea\OneDrive\Documents\UCSP 2023\STATA"
+
+use clinic_bp.dta
+br
+
+***Remove all the afters
+drop if when == 2
+//or
+keep if when == 1
+//or
+clear
+
+gen big_n = _N //gives total number of observations
+gen small_n = _n
+
+drop big_n small_n
+
+//How many BP measurements does each patient have?
+bysort ptid: gen big_n = _N
+tab big_n
+
+//Load lft dataset
+clear
+use lft.dta
+br
+
+//I only want the first liver test for each patient (either AST or ALT)
+sort ptid evntdate
+
+bysort ptid: gen n = _n
+keep if n == 1
+drop n
+
+ssc install distinct
+distinct ptid
+clear
+
+//How many AST and ALT tests did each patient get?
+bysort ptid lft: gen total_labs = _N //gives total # of AST and ALT
+
+bysort ptid: gen ast_n = total_labs if lft == 1
+bysort ptid: gen alt_n = total_labs if lft == 2
+
+bysort ptid: egen ast_total = max(ast_n)
+bysort ptid: egen alt_total = max(alt_n)
+
+tab total_labs if lft == 1
+hist total_labs if lft == 1
+
+bysort ptid: gen n = _n
+keep if n == 1
+drop total_labs ast_n alt_n
+drop n
+distinct ptid
+
+tab ast_total
+tab alt_total
+
+// I want the total number of lab tests for each patient
+bysort ptid: gen total = _N
+
+bysort ptid: gen n = _n
+keep if n == 1
+drop n
+
+tab total
+
+// Complete case analysis aka listwise deletion is when you drop missing data
+
+clear
+input a1 a2 a3 a4 a5 a6 a7 a8
+1 2 3 4 5 6 97 88
+2 4 5 97 88 97 3 4
+97 88 2 3 1 2 97 88
+3 5 97 88 97 3 4 5
+end
+br
+
+// Loop
+foreach i in a1 a2 a3 a4 a5 a6 a7 a8 {
+	replace `i' = . if `i' == 97
+	replace `i' = . if `i' == 88
+}
+
+foreach i in {
+	
+}
+
+forvalues i = 1/8 {
+	replace a`i' = . if a`i' == 97
+	replace a`i' = . if a`i' == 88
+}
+
+// Load bpwide dataset
+
+sysuse bpwide.dta
+br
+
+// ANOVAs
+tab agegrp
+
+hist bp_before // right-skewed, but for sake of example, pretend normal
+
+oneway bp_before agegrp // reject the hypothesis that the means are equal across all groups for ANOVA; we fail to reject for Bartlett'sake
+
+bysort agegrp: sum bp_before
+oneway bp_before agegrp, bonferroni tabulate
+
+// Now assume non-normality
+help kwallis
+kwallis bp_before, by(agegrp) // at least two group medians are different
+ranksum bp_before if agegrp == 1 | agegrp == 2, by(agegrp) // no sig difference
+ranksum bp_before if agegrp == 2 | agegrp == 3, by(agegrp) // sig difference
+ranksum bp_before if agegrp == 1 | agegrp == 3, by(agegrp) // sig difference
+
+di 0.05/3 // alpha threshold with bonferroni correction is 0.16667
+
+
+***Load Philadelphia
+import delimited "C:\Users\Sebastian Pintea\OneDrive\Documents\UCSP 2023\STATA\arrest_data_daily_citywide.txt", clear
+br
+
+// clean up date variable
+gen date = date(date_value, "YMD")
+order date
+format date %td
+drop date_value
+
+format date %5.0f
+
+gen covid = 1 if date >= 21975 & date !=.
+replace covid = 0 if date < 21975
+order covid
+
+save cleaned.dta, replace
+
+// Hypothesis: drug sales different in COVID versus non-COVID era
+order drugsales
+
+hist drugsales // right skewed
+sktest drugsales
+
+// descriptive data
+bysort covid: sum drugsales, det
+
+//Wilcoxon RS
+ranksum drugsales, by(covid)
+
+*** Visualize drug sales overtime
+use cleaned.dta, clear
+collapse (sum) drugsales, by(month)
+scatter drugsales date
+
+// extract variables from date variables
+gen year = year(date)
+order year
+gen month = month(date)
+order month
+
+scatter drugsales year
+
+collapse (sum) drugsales, by(year)
+collapse (sum) drugsales, by(month) // dont use this because it will just collapse things into one row since the months are numbered
+
+drop if year == 2022
+scatter drugsales year
+scatter drugsales month, xla(1(1)12)
+regress drugsales month
+
+graph twoway (scatter drugsales month) || (lfit drugsales month), xla(1(1)12)
+
+// we actually want to look at drug sales by month through the years
+use cleaned.dta, clear
+collapse (sum) drugsales, by(year month)
+
+gen n = _n
+
+scatter drugsales n, xla(0(10)100) yla(0(50)600) xtitle("Months") ytitle("Volume of Drug Sales") xline(75) scheme(plottig) xsize(6) ysize(5)
+
+ssc install git
+git install https://github.com/danbischof/plottig
+
+net install scheme-modern, from("https://raw.githubusercontent.com/mdroste/stata-scheme-modern/master/")
+graph query, scheme
+
+set scheme plottig, permanently
+
+```````
+***Set working directory***
+cd "C:\Users\Sebastian Pintea\OneDrive\Documents\UCSP 2023\STATA"
+
+use deadspace.dta
+br
+
+// Is height associated with deadspace
+
+scatter deadspace height
+hist deadspace
+
+regress deadspace height
+di 120 * 1.033323 + -82.4852 //expected value of someone who is 120 cm tall
+
+// Formula: deadspace = -82.4852 + 1.033323 * height
+
+lincom _cons + height * 120
+lincom height * 10 // rescales the beta coefficient for height
+
+// Is asthma associated with deadspace?
+
+regress deadspace asthma
+
+numlabel, add
+tab asthma
+
+// Formula --> deadspace = 83 + -30.125*asthma
+lincom _cons + asthma*0
+lincom _cons + asthma*1
+
+// Is age a confounder in the relationship between asthma and deadspace?
+regress deadspace age asthma // multi-variable
+// Those coping with asthma will have a -17 decrease of deadspace, adjusting for age; hence age is a confounder in the association between asthma and deadspace
+
+// Formula --> deadspace = 27.309 - 17.66 * asthma + 6.28 * age
+
+// What is the expected deadspace for someone who is 15 years old with asthma?
+lincom _cons + asthma*1 + age*15
+
+regress deadspace age asthma height //age's p-value increased most likely due to heights positive relationship with age
+regress deadspace asthma height // height appears to be the more important variable; intuitively it makes sense that as you're taller that you might have more deadspace compared to age
+regress deadspace age asthma
+
+// Multicollinearity: occurs when multiple variables are highly correlated in a model
+
+use bmi_data.dta, clear
+br
+
+tab smoking
+tab sex
+
+// How to check for missingness?
+
+ssc install mdesc
+mdesc
+// Is sex associated with BMI?
+
+regress bmi sex 
+
+numlabel, add
+tab sex
+
+// Is smoking status associated with bmi?
+
+regress bmi i.smoking
+
+numlabel, add
+tab smoking
+
+testparm i.smoking // tests overall significance of smoking association with bmi
+
+// Is smoking associated with bmi, adjusting for sex?
+
+regress bmi i.smoking i.sex, base
+testparm i.smoking // smoking status associated with BMI, adjusting for sex
+
+// Logistic Regression
+
+di -16.52 + .0048*3000 + 6.62*1 //= 4.5
+di exp(4.5)
+
+di .989/(1-0.989) //odds
+di .107/(1-.107) //odds
+di 89.909091/.11982083 //odds ratio
+
+//Load Lab 9 Dataset
+use lab_9.dta, clear
+br
+
+logit status admit_type
+logistic status admit_type
+cc status admit_type //also works
+
+tab admit_type
+logistic status i.admit_type age
+lincom age*10
+
+// 1.Association between infection and death
+logistic status i.infection
+
+// 2.Association between infection and death in the ICU for women and men. Is sex an effect modifier?
+
+logistic status i.infection if sex == 1 //female (not associated with death)
+logistic status i.infection if sex == 0 //male (associated with death)
+
+logistic status i.infection##i.sex
+
+`````````
+exit
+***Set working directory***
+cd "C:\Users\Sebastian Pintea\OneDrive\Documents\UCSP 2023\STATA"
+
+use french_econ.dta
+br
+
+scatter import year
+regress import year
+predict fitted_values, xb // xb = linear predictor
+scatter fitted_values year
+
+
+rvfplot, yline(0)
+predict residual, res
+scatter residual year, yline(0)
+
+graph twoway (scatter import year) || (line fitted_values year)
+
+gen log_import = log(import)
+
+scatter log_import year
+regress log_import year
+rvfplot, yline(0)
+
+// Create era 
+gen era = 0 if year < 60
+replace era = 1 if year >= 60 & year != .
+
+regress import year if era == 0
+regress import year if era == 1 //era is impacting
+
+// Visualize a potential intercation 
+graph twoway (scatter import year) || (lfit import year if era == 0) || (lfit import year if era == 1)
+
+regress import i.era##c.year
+regress import i.era year i.era#c.year
+
+di 3.076 + 1.298
+
+lincom year + 1.era#c.year
+lincom year + 0.era#c.year
+
+rvfplot, yline(0)
+
+// Evaluate association with other variables
+scatter import dom_prod
+scatter import stock
+scatter import consum
+
+graph matrix import dom_prod stock consum
+pwcorr import dom_prod stock consum
+
+regress import dom_prod
+regress import stock
+regress import consum
+
+regress import dom_prod consum// co-linearity bc the p-values increased greatly and a huge increase in standard error
+scatter dom_prod consum// super associated
+
+regress import dom_prod consum
+vif
+
+// our goal is to identify variables associated with price
+// Etiology based model
+// Potential variables ---> mpg, headroom, trunk, weight, length, foreign, gear_ratio
+sysuse auto2.dta, clear
+
+***backward selection example
+regress price mpg headroom trunk weight length gear_ratio i.foreign
+regress price headroom trunk weight length gear_ratio i.foreign
+regress price headroom weight length gear_ratio i.foreign
+regress price headroom weight length i.foreign
+regress price weight length i.foreign //model from backward selection
+
+stepwise, pe(0.05): regress price mpg headroom trunk weight length gear_ratio i.foreign
+stepwise, pr(0.05): regress price mpg headroom trunk weight length gear_ratio i.foreign
+
+stepwise, pe(0.05) pr(0.051) forward: regress price mpg headroom trunk weight length gear_ratio i.foreign // forward stepwise selection
+stepwise, pe(0.05) pr(0.051): regress price mpg headroom trunk weight length gear_ratio i.foreign // backward stepwise selection
+
+***Candidate model
+regress price weight length i.foreign // model from backward selection
+estimates store m1
+
+regress price weight length i.foreign turn // model from a priori approach
+estimates store m2
+
+estimates stats m1 m2
+
+sysuse cancer.dta
+
+// Survival Analysis 
+
+stset studytime, fail(died=1)
+
+sts graph, ytitle("Survival Probability") cen(single) risktable
+sts graph, ytitle("Survival Probability") cen(single) 
+
+sts graph, by(drug) ytitle("Survival Probability") cen(single) ci legend(off)
+
+// Log-rank test ---> tests differences in survival distributions
+sts test drug
+
+sts graph, by(drug) ytitle("Survival Probability") cen(single) text(0.1255 "p<0.001") title("Kaplan-Meier Unadjusted Survival Curves")
+
+stdes
+stsum, by(drug) // will give median survival time
+
+stcox i.drug, base
+stcox ib3.drug, base
+
+stcox i.drug age, base
+stcurve, survival at1(drug=1) at2(drug=2) at3(drug=3) title("Cox-Adjusted Survival Curves")
+
+numlabel, add
+tab drug

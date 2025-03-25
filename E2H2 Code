@@ -1,0 +1,358 @@
+```{r}
+
+library(readstata13)
+library(corrplot)
+library(here)
+library(tidyverse)
+library(ggplot2)
+library(dplyr)
+library(skimr)
+library(expss)
+library(ggthemes)
+
+```
+
+# Read Data
+
+```{r}
+
+library(haven)
+df <- read_dta("eiraw2.dta")
+
+```
+
+# Focused Variables
+
+```{r}
+
+newdata2 <- df[ which(df$ESC1ar1==1), ]
+
+newdata3 <- newdata2 %>% 
+  select(rnid, CEP1, CEP2, CEP3, CEP4, CEP5, CEP6, HEC1r1a, HEC1r1b, 
+         HEC1r1c, HEC1r1d, HEC2r1, HEC2r2, HEC2r5, 
+         HEC2r6, HEC2r7, HEC2r8, HEC3r3a, 
+         HEC3r3b, HEC3r3c, HEC3r3d, HEC3r3e, 
+         HEC3r3f, HEC3r3g, HEC3r3h, HEC5a, HEC6a, EB2a, EB7a, EB8a, EH1a_er1a, EH1a_er2b, EH1a_er3c, EH1a_er4d)
+
+newdata3 <- na.omit(newdata3)
+
+newdata3.1 <- rename(newdata3, coping_redconsump=CEP1, coping_stove=CEP2, coping_restricrooms=CEP3, coping_leavehome=CEP4, coping_tradeoff=CEP5, coping_moved=CEP6, satis_housquality=HEC1r1a, satis_housmaint=HEC1r1b, satis_temp=HEC1r1c, satis_utilityserv=HEC1r1d, repair_roof=HEC2r1, repair_porch=HEC2r2, repair_cool=HEC2r5, repair_plumb=HEC2r6, repair_elect=HEC2r7,  repair_door=HEC2r8, efficy_light=HEC3r3a, efficy_insul=HEC3r3b, efficy_applnce=HEC3r3c, efficy_windows=HEC3r3d, efficy_thermstat=HEC3r3e, efficy_heatsys=HEC3r3f, efficy_coolsys=HEC3r3g, efficy_plumbng=HEC3r3h, thermcomf_cold=HEC5a, thermcomf_hot=HEC6a, burden_unabletopay=EB2a, access_shutoff=EB7a, access_poweroutage=EB8a, sleep_quality=EH1a_er1a, mental_health=EH1a_er2b, respiratory=EH1a_er3c, medical_devices=EH1a_er4d)
+
+newdata3subset <- newdata2 %>% 
+  select(rnid, CEP1, CEP2, CEP3, CEP4, CEP5, CEP6, HEC1r1a, HEC1r1b, 
+         HEC1r1c, HEC1r1d, HEC2r1, HEC2r2, HEC2r5, 
+         HEC2r6, HEC2r7, HEC2r8, HEC3r3a, 
+         HEC3r3b, HEC3r3c, HEC3r3d, HEC3r3e, 
+         HEC3r3f, HEC3r3g, HEC3r3h, HEC5a, HEC6a, EB2a, EB7a, EB8a)
+
+newdata3subset <- na.omit(newdata3subset)
+
+newdata3.1subset <- rename(newdata3subset, coping_redconsump=CEP1, coping_stove=CEP2, coping_restricrooms=CEP3, coping_leavehome=CEP4, coping_tradeoff=CEP5, coping_moved=CEP6, satis_housquality=HEC1r1a, satis_housmaint=HEC1r1b, satis_temp=HEC1r1c, satis_utilityserv=HEC1r1d, repair_roof=HEC2r1, repair_porch=HEC2r2, repair_cool=HEC2r5, repair_plumb=HEC2r6, repair_elect=HEC2r7,  repair_door=HEC2r8, efficy_light=HEC3r3a, efficy_insul=HEC3r3b, efficy_applnce=HEC3r3c, efficy_windows=HEC3r3d, efficy_thermstat=HEC3r3e, efficy_heatsys=HEC3r3f, efficy_coolsys=HEC3r3g, efficy_plumbng=HEC3r3h, thermcomf_cold=HEC5a, thermcomf_hot=HEC6a, burden_unabletopay=EB2a, access_shutoff=EB7a, access_poweroutage=EB8a)
+
+newdata5 <- newdata3.1 %>% mutate(case_when(sleep_quality == "1" ~ 0, sleep_quality == "2" ~ 0, sleep_quality == "5" ~ 0, sleep_quality == "4" ~ 1, sleep_quality == "3" ~ 1)) %>% mutate(factor(case_when(mental_health == "1" ~ 0, mental_health == "2" ~ 0, mental_health == "5" ~ 0, mental_health == "4" ~ 1, mental_health == "3" ~ 1))) %>% select(`case_when(...)`, `factor(...)`) %>% rename(sleep_quality=`case_when(...)`, mental_health=`factor(...)`)
+
+newdata5.2 <- newdata3.1 %>% mutate(case_when(respiratory == "1" ~ 0, respiratory == "2" ~ 0, respiratory == "5" ~ 0, respiratory == "4" ~ 1, respiratory == "3" ~ 1)) %>% mutate(factor(case_when(medical_devices == "1" ~ 0, medical_devices == "2" ~ 0, medical_devices == "5" ~ 0, medical_devices == "4" ~ 1, medical_devices == "3" ~ 1))) %>% select(`case_when(...)`, `factor(...)`) %>% rename(respiratory=`case_when(...)`, medical_devices=`factor(...)`)
+
+newdata5.2$medical_devices <- as.numeric(as.character(newdata5.2$medical_devices))
+newdata5$mental_health <- as.numeric(as.character(newdata5$mental_health))
+
+newdata5.3 <- bind_cols(newdata5, newdata5.2)
+recodedata <- bind_cols(newdata3.1subset, newdata5.3)
+
+```
+
+# Focused variables w/o some Efficiency and Satisfaction Variables
+
+```{r}
+
+newdata6 <- recodedata %>% 
+  select(rnid, coping_redconsump, coping_stove, coping_restricrooms, coping_leavehome, coping_tradeoff, coping_moved, satis_housquality, thermcomf_cold, thermcomf_hot, burden_unabletopay, access_shutoff, access_poweroutage, sleep_quality, mental_health, respiratory, medical_devices)
+
+newdata6 <- na.omit(newdata6)
+
+```
+
+# Create Correlation Plot
+
+```{r}
+library(corrplot)
+M = cor(newdata6[, unlist(lapply(newdata6, is.numeric))])
+col <- colorRampPalette(c("#BB4444", "#EE9988", "#FFFFFF", "#77AADD", "#4477AA"))
+corrplot(M, method = "circle", mar = c(0,0,0,0), type = "upper", order = "hclust", addCoef.col = "black", number.cex = .55, tl.cex = .6, tl.col = "black", tl.srt = 45, sig.level = 0.01, insig = "blank", diag = FALSE) 
+
+```
+
+# Convert to Frequencies
+
+```{r}
+
+newdata6.1 <- gather(newdata6, variable, value, coping_redconsump:access_poweroutage, factor_key=TRUE) 
+newdata6.1$value <- as.numeric(newdata6.1$value)
+newdata_table6.1 <- newdata6.1 %>% group_by(variable) %>% summarize(count = sum(value), N = n()) %>% mutate(freq = count / N, pct = round((freq*100), 0))
+
+newdata4 <- gather(newdata3.1, variable, value, coping_redconsump:access_poweroutage, factor_key=TRUE) 
+newdata4$value <- as.numeric(newdata4$value)
+newdata_table <- newdata4 %>% group_by(variable) %>% summarize(count = sum(value), N = n()) %>% mutate(freq = count / N, pct = round((freq*100), 0))
+
+```
+
+# Subset Data to sleep quality
+
+```{r}
+
+newdatasleep <- recodedata[ which(recodedata$sleep_quality==1), ]
+
+# Only 17 Variables
+
+newdatasleep1 <- newdata6[ which(newdata6$sleep_quality==1), ]
+
+```
+
+# Subset Data to mental health
+
+```{r}
+
+newdatamental_health <- recodedata[ which(recodedata$mental_health==1), ]
+
+# Only 17 variables
+
+newdatamental_health1 <- newdata6[ which(newdata6$mental_health==1), ]
+
+```
+
+# Subset Data to respiratory
+
+```{r}
+
+newdatarespiratory <- recodedata[ which(recodedata$respiratory==1), ]
+
+# Only 17 variables
+
+newdatarespiratory1 <- newdata6[ which(newdata6$respiratory==1), ]
+
+```
+
+# Subset Data to medical devices
+
+```{r}
+
+newdatamedical_devices <- recodedata[ which(recodedata$medical_devices==1), ]
+
+# Only 17 Variables
+
+newdatamedical_devices1 <- newdata6[ which(newdata6$medical_devices==1), ]
+
+```
+
+# Convert frequencies into percentages for sleep quality
+
+```{r}
+
+df26_long_sleep <- gather(newdatasleep, variable, value, coping_redconsump:access_poweroutage, factor_key=TRUE) 
+df26_long_sleep$value <- as.numeric(df26_long_sleep$value)
+df26_long_table_sleep <- df26_long_sleep %>% group_by(variable) %>% summarize(count = sum(value), N = n()) %>% mutate(freq = count / N, pct = round((freq*100), 0))
+
+# Only 17 Variables
+
+df26_long_sleep1 <- gather(newdatasleep1, variable, value, coping_redconsump:access_poweroutage, factor_key=TRUE) 
+df26_long_sleep1$value <- as.numeric(df26_long_sleep1$value)
+df26_long_table_sleep1 <- df26_long_sleep1 %>% group_by(variable) %>% summarize(count = sum(value), N = n()) %>% mutate(freq = count / N, pct = round((freq*100), 0))
+
+
+```
+
+# Convert frequencies into percentages for mental health
+
+```{r}
+
+df26_long_mental <- gather(newdatamental_health, variable, value, coping_redconsump:access_poweroutage, factor_key=TRUE) 
+df26_long_mental$value <- as.numeric(df26_long_mental$value)
+df26_long_table_mental <- df26_long_mental %>% group_by(variable) %>% summarize(count = sum(value), N = n()) %>% mutate(freq = count / N, pct = round((freq*100), 0))
+
+# Only 17 Variables
+
+df26_long_mental1 <- gather(newdatamental_health1, variable, value, coping_redconsump:access_poweroutage, factor_key=TRUE) 
+df26_long_mental1$value <- as.numeric(df26_long_mental1$value)
+df26_long_table_mental1 <- df26_long_mental1 %>% group_by(variable) %>% summarize(count = sum(value), N = n()) %>% mutate(freq = count / N, pct = round((freq*100), 0))
+
+```
+
+# Convert frequencies into percentages for respiratory
+
+```{r}
+
+df26_long_respiratory <- gather(newdatarespiratory, variable, value, coping_redconsump:access_poweroutage, factor_key=TRUE) 
+df26_long_respiratory$value <- as.numeric(df26_long_respiratory$value)
+df26_long_table_respiratory <- df26_long_respiratory %>% group_by(variable) %>% summarize(count = sum(value), N = n()) %>% mutate(freq = count / N, pct = round((freq*100), 0))
+
+# Only 17 Variables
+
+df26_long_respiratory1 <- gather(newdatarespiratory1, variable, value, coping_redconsump:access_poweroutage, factor_key=TRUE) 
+df26_long_respiratory1$value <- as.numeric(df26_long_respiratory1$value)
+df26_long_table_respiratory1 <- df26_long_respiratory1 %>% group_by(variable) %>% summarize(count = sum(value), N = n()) %>% mutate(freq = count / N, pct = round((freq*100), 0))
+
+```
+
+# Convert frequencies into percentages for medical devices
+
+```{r}
+
+df26_long_medical <- gather(newdatamedical_devices, variable, value, coping_redconsump:access_poweroutage, factor_key=TRUE) 
+df26_long_medical$value <- as.numeric(df26_long_medical$value)
+df26_long_table_medical <- df26_long_medical %>% group_by(variable) %>% summarize(count = sum(value), N = n()) %>% mutate(freq = count / N, pct = round((freq*100), 0))
+
+# Only 17 Variables
+
+df26_long_medical1 <- gather(newdatamedical_devices1, variable, value, coping_redconsump:access_poweroutage, factor_key=TRUE) 
+df26_long_medical1$value <- as.numeric(df26_long_medical1$value)
+df26_long_table_medical1 <- df26_long_medical1 %>% group_by(variable) %>% summarize(count = sum(value), N = n()) %>% mutate(freq = count / N, pct = round((freq*100), 0))
+
+```
+
+# Create a barplot for sleep quality
+
+```{r}
+
+p3 <- ggplot(df26_long_table_sleep, aes(x = reorder(variable, freq), y = freq)) + ggtitle("EI Indicators for Those Who Report That Energy Problems Are Affecting Their Sleep Quality (N=494)")
+
+p4 <- p3 + geom_col(position = "dodge2") +  labs(x = NULL, y = "Percent") +  guides(fill = "none") +  coord_flip() + theme(text = element_text(size = 20))
+p4
+
+ggsave(p4, file = "barplot_sleep_quality.pdf", width = 20, height = 20)
+
+```
+
+# Create a barplot for mental health
+
+```{r}
+
+p5 <- ggplot(df26_long_table_mental, aes(x = reorder(variable, freq), y = freq)) + ggtitle("EI Indicators for Those Who Report That Energy Problems Are Affecting Their Mental Health (N=392)")
+
+p6 <- p5 + geom_col(position = "dodge2") +  labs(x = NULL, y = "Percent") +  guides(fill = "none") +  coord_flip() + theme(text = element_text(size = 20))
+
+ggsave(p6, file = "barplotmentalhealth.pdf", width = 20, height = 20)
+
+```
+
+# Create a barplot for respiratory
+
+```{r}
+
+p7 <- ggplot(df26_long_table_respiratory, aes(x = reorder(variable, freq), y = freq)) + ggtitle("EI Indicators for Those Who Report That Energy Problems Are Affecting Their Respiratory Functions (N=287)")
+
+p8 <- p7 + geom_col(position = "dodge2") +  labs(x = NULL, y = "Percent") +  guides(fill = "none") +  coord_flip() + theme(text = element_text(size = 20))
+
+ggsave(p8, file = "barplot_respiratory.pdf", width = 20, height = 20)
+
+```
+
+# Create a barplot for medical devices
+
+```{r}
+
+p9 <- ggplot(df26_long_table_medical, aes(x = reorder(variable, freq), y = freq)) + ggtitle("EI Indicators for Those Who Report That Energy Problems Are Affecting Their Medical Devices (N=177)")
+
+p10 <- p9 + geom_col(position = "dodge2") +  labs(x = NULL, y = "Percent") +  guides(fill = "none") +  coord_flip() + theme(text = element_text(size = 20))
+
+ggsave(p10, file = "barplot_medicaldevices.pdf", width = 20, height = 20)
+
+```
+
+# Create side-by-side barplots for sleep quality
+
+```{r}
+
+df_side_sleep <- rbind(newdata_table, df26_long_table_sleep)
+plot <- ggplot(df_side_sleep, aes(fct_reorder(variable, freq), freq, fill=factor(N)))
+plot <- plot + geom_col(stat = 'identity', position = 'dodge2') + labs(x = NULL, y = "Percent") + coord_flip() + ggtitle("Prevalence of EI Indicators Among Those With Energy-Related Sleep Problems Versus General Population") + scale_fill_manual(values=c("Royalblue2", "Darkseagreen"), name="Population Type", breaks=c("494", "1704"), labels=c("Sleep Quality Population", "General Population")) + theme(text = element_text(size = 20))
+plot
+
+ggsave(plot, file = "barplot_side_sleepquality.pdf", width = 19, height = 19)
+
+```
+
+# Only 12 Variables
+
+```{r}
+df_side_sleep1 <- rbind(newdata_table6.1, df26_long_table_sleep1)
+plot4 <- ggplot(df_side_sleep1, aes(fct_reorder(variable, freq), freq, fill=factor(N)))
+plot4 <- plot4 + geom_col(stat = 'identity', position = 'dodge2') + labs(x = NULL, y = "Percent") + coord_flip() + ggtitle("Prevalence of EI Indicators Among Those With Energy-Related Sleep Problems Versus General Population") + scale_fill_manual(values=c("Royalblue2", "Darkseagreen"), name="Population Type", breaks=c("494", "1704"), labels=c("Sleep Quality Population", "General Population")) + theme(text = element_text(size = 20))
+plot4
+
+ggsave(plot4, file = "barplot_side_sleepquality1.pdf", width = 19, height = 9)
+
+```
+
+# Create side-by-side barplots for mental health
+
+```{r}
+
+df_side_mental <- rbind(newdata_table, df26_long_table_mental)
+plot1 <- ggplot(df_side_mental, aes(fct_reorder(variable, freq), freq, fill=factor(N)))
+plot1 <- plot1 + geom_col(stat = 'identity', position = 'dodge2') + labs(x = NULL, y = "Percent") + coord_flip() + ggtitle("Prevalence of EI Indicators Among Those With Energy-Related Mental Health Problems Versus General Population") + scale_fill_manual(values=c("Royalblue2", "Darkseagreen"), name="Population Type", breaks=c("392", "1704"), labels=c("Mental Health Population", "General Population")) + theme(text = element_text(size = 20))
+plot1
+
+ggsave(plot1, file = "barplot_side_mentalhealth.pdf", width = 20, height = 20)
+
+```
+
+# Only 12 Variables
+
+```{r}
+df_side_mental1 <- rbind(newdata_table6.1, df26_long_table_mental1)
+plot5 <- ggplot(df_side_mental1, aes(fct_reorder(variable, freq), freq, fill=factor(N)))
+plot5 <- plot5 + geom_col(stat = 'identity', position = 'dodge2') + labs(x = NULL, y = "Percent") + coord_flip() + ggtitle("Prevalence of EI Indicators Among Those With Energy-Related Mental Health Problems Versus General Population") + scale_fill_manual(values=c("Royalblue2", "Darkseagreen"), name="Population Type", breaks=c("392", "1704"), labels=c("Mental Health Population", "General Population")) + theme(text = element_text(size = 20))
+plot5
+
+ggsave(plot5, file = "barplot_side_mentalhealth1.pdf", width = 20, height = 10)
+
+```
+
+# Create side-by-side barplots for respiratory
+
+```{r}
+
+df_side_respiratory <- rbind(newdata_table, df26_long_table_respiratory)
+plot2 <- ggplot(df_side_respiratory, aes(fct_reorder(variable, freq), freq, fill=factor(N)))
+plot2 <- plot2 + geom_col(stat = 'identity', position = 'dodge2') + labs(x = NULL, y = "Percent") + coord_flip() + ggtitle("Prevalence of EI Indicators Among Those With Energy-Related Respiratory Problems Versus General Population") + scale_fill_manual(values=c("Royalblue2", "Darkseagreen"), name="Population Type", breaks=c("287", "1704"), labels=c("Respiratory Population", "General Population")) + theme(text = element_text(size = 20))
+plot2
+
+ggsave(plot2, file = "barplot_side_respiratory.pdf", width = 19, height = 19)
+```
+
+# Only 12 Variables
+
+```{r}
+df_side_respiratory1 <- rbind(newdata_table6.1, df26_long_table_respiratory1)
+plot6 <- ggplot(df_side_respiratory1, aes(fct_reorder(variable, freq), freq, fill=factor(N)))
+plot6 <- plot6 + geom_col(stat = 'identity', position = 'dodge2') + labs(x = NULL, y = "Percent") + coord_flip() + ggtitle("Prevalence of EI Indicators Among Those With Energy-Related Respiratory Problems Versus General Population") + scale_fill_manual(values=c("Royalblue2", "Darkseagreen"), name="Population Type", breaks=c("287", "1704"), labels=c("Respiratory Population", "General Population")) + theme(text = element_text(size = 20))
+plot6
+
+ggsave(plot6, file = "barplot_side_respiratory1.pdf", width = 19, height = 9)
+
+```
+
+# Create side-by-side barplots for medical devices
+
+```{r}
+
+df_side_medical <- rbind(newdata_table, df26_long_table_medical)
+plot3 <- ggplot(df_side_medical, aes(fct_reorder(variable, freq), freq, fill=factor(N)))
+plot3 <- plot3 + geom_col(stat = 'identity', position = 'dodge2') + labs(x = NULL, y = "Percent") + coord_flip() + ggtitle("Prevalence of EI Indicators Among Those With Energy-Related Medical Device Problems Versus General Population") + scale_fill_manual(values=c("Royalblue2", "Darkseagreen"), name="Population Type", breaks=c("177", "1704"), labels=c("Medical Devices Population", "General Population")) + theme(text = element_text(size = 20))
+plot3
+
+ggsave(plot3, file = "barplot_side_medicaldevices.pdf", width = 20, height = 20)
+```
+
+# Only 12 Variables
+
+```{r}
+df_side_medical1 <- rbind(newdata_table6.1, df26_long_table_medical1)
+plot7 <- ggplot(df_side_medical1, aes(fct_reorder(variable, freq), freq, fill=factor(N)))
+plot7 <- plot7 + geom_col(stat = 'identity', position = 'dodge2') + labs(x = NULL, y = "Percent") + coord_flip() + ggtitle("Prevalence of EI Indicators Among Those With Energy-Related Medical Device Problems Versus General Population") + scale_fill_manual(values=c("Royalblue2", "Darkseagreen"), name="Population Type", breaks=c("177", "1704"), labels=c("Medical Devices Population", "General Population")) + theme(text = element_text(size = 20))
+plot7
+
+
+ggsave(plot7, file = "barplot_side_medicaldevices1.pdf", height = 10, width = 20)
+
+```

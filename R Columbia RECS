@@ -1,0 +1,238 @@
+## R Markdown
+
+# Load necessary package
+```{r}
+
+# Load necessary package
+library(tidyverse)
+library(here)
+#################################################################
+
+
+setwd("H:/Diana/RSF_Galo_RECS")
+here::i_am("data_for_analysis_codes_2020.R")
+
+
+here()
+
+
+recs <- read_csv(here("recs2020_public_v1.csv"))   %>% # Read original data file. You must change file directory.
+  mutate(
+    # Measure % of coping - financial assistance (recall period is "ever" for ENERGYASST, past year for the others)
+    cope_financial = ifelse(ENERGYASST==1 | NOACHELP==1 | NOHEATHELP==1 | PAYHELP==1, 1, 0),
+    cope_financial = factor(cope_financial, labels=c("No", "Yes")),
+    
+    # Unhealthy Temperature (Diana, 2-3-22)
+    cope_temp = ifelse(SCALEG>0, 1, 0),
+    cope_temp = factor(cope_temp, labels=c("No", "Yes")),
+    
+    # Make SCALEB factor type; forego (Galo)
+    scaleb = ifelse(SCALEB>0, 1, 0),
+    scaleb = factor(scaleb, labels=c("No", "Yes")),
+    
+    # Combinations of coping variables (Diana, 2-7-22)
+    cope_1 = ifelse(cope_temp=="Yes" | scaleb=="Yes", 1, 0),
+    cope_1 = factor(cope_1, labels=c("No", "Yes")),
+    cope_2 = ifelse(cope_financial=="Yes" | scaleb=="Yes", 1, 0),
+    cope_2 = factor(cope_2, labels=c("No", "Yes")),
+    cope_3 = ifelse(cope_temp=="Yes" | cope_financial=="Yes", 1, 0),
+    cope_3 = factor(cope_3, labels=c("No", "Yes")),
+    cope_4 = ifelse(cope_temp=="Yes" | cope_financial=="Yes" | scaleb=="Yes", 1, 0),
+    cope_4 = factor(cope_4, labels=c("No", "Yes")),
+    
+    # Estimation of median HH income using 2020 ACS
+    hhinc = ifelse(MONEYPY==1, 910, 0),
+    hhinc = replace(hhinc, MONEYPY==2, 6000),
+    hhinc = replace(hhinc, MONEYPY==3, 9100),
+    hhinc = replace(hhinc, MONEYPY==4, 11200),
+    hhinc = replace(hhinc, MONEYPY==5, 13800),
+    hhinc = replace(hhinc, MONEYPY==6, 17300),
+    hhinc = replace(hhinc, MONEYPY==7, 22200),
+    hhinc = replace(hhinc, MONEYPY==8, 27000),
+    hhinc = replace(hhinc, MONEYPY==9, 32000),
+    hhinc = replace(hhinc, MONEYPY==10, 37000),
+    hhinc = replace(hhinc, MONEYPY==11, 44500),
+    hhinc = replace(hhinc, MONEYPY==12, 54200),
+    hhinc = replace(hhinc, MONEYPY==13, 66600),
+    hhinc = replace(hhinc, MONEYPY==14, 85800),
+    hhinc = replace(hhinc, MONEYPY==15, 151000),
+    
+    # Energy burden (Diana, 2-3-22) 7/17/22 - No TOTALDOL available
+    #burden = TOTALDOL/hhinc,
+    
+    # Different Thresholds for Energy Burden (Diana, 2-7-22)
+    #burden1 = ifelse(burden <= 0.05, 1, 0),
+    #burden1 = replace(burden1, burden>=0.06 & burden<0.10, 2),
+    #burden1 = replace(burden1, burden>=0.1, 3),
+    #burden1 = factor(burden1, labels=c("Other","No burden (5% or less)","Moderate burden (6% to less 10%)","Severe burden (10% or more)")),
+    
+    #burden2 = ifelse(burden < 0.03, 1, 0),
+    #burden2 = replace(burden2, burden>=0.03 & burden<=0.05, 2),
+    #burden2 = replace(burden2, burden>=0.06 & burden<0.10, 3),
+    #burden2 = replace(burden2, burden>=0.10, 4),
+    #burden2 = factor(burden2, labels=c("Other","No burden (<3%)","Mild burden (3% to 5%)","Moderate burden (6% to <10%)","Severe burden (10% or more)")),
+    
+    
+    # Calculation of energy intensity (Diana, 2-3-22) - TOTALDOL NOT IN 2020?
+    # intense = TOTALDOL/TOTSQFT_EN,
+    
+    # Make a copy of MONEYPY and recode to five groups (Jenn, 2-28-22)
+    moneypy = MONEYPY,
+    #moneypy = replace(moneypy, MONEYPY>=5, 5),
+    #moneypy = factor(moneypy, labels=c("0 to < $20K","20 to < $40K","40 to < $60K","60 to < $80K","$80,000+")),
+    
+    
+    # Physical EI variables (Jenn recode, 2-7-22)
+    noacbroke = factor(NOACBROKE, labels=c("No","Yes")),
+    noheatbroke = factor(NOHEATBROKE, labels=c("No","Yes")),
+    aircond = factor(AIRCOND, labels=c("No","Yes")),
+    adqinsul = ifelse(ADQINSUL>2, 0, 1),
+    adqinsul = factor(adqinsul, labels=c("Not/poorly","Adequately/Well")),
+    typeglass = ifelse(TYPEGLASS==1, 1, 0),
+    typeglass = factor(typeglass, labels=c("Double/Triple","Single")),
+    drafty = ifelse(DRAFTY<3,1,0),
+    drafty = factor(drafty, labels=c("Never/Some","Most/All")),
+    
+    # Any Physical EI variable occurred (Diana, 2-7-22)
+    anyphysical = ifelse(noacbroke=="Yes" | noheatbroke=="Yes" | adqinsul=="Not/poorly" | typeglass=="Single" | aircond=="No" | drafty=="Most/All", 1, 0),
+    anyphysical =  factor(anyphysical, labels = c("No","Yes")),
+    # Any Physical EI variable occurred - DO NOT CONSIDER SINGLE PANE WINDOW (Diana, Zoom meeting 4-14-22)
+    anyphysical_2 = ifelse(noacbroke=="Yes" | noheatbroke=="Yes" | adqinsul=="Not/poorly" | aircond=="No" | drafty=="Most/All", 1, 0),
+    anyphysical_2 =  factor(anyphysical_2, labels = c("No","Yes")),
+    # Any Coping EI variable occurred (Diana, 2-10-22)
+    anycoping = ifelse(cope_financial=="Yes" | cope_temp=="Yes" | scaleb=="Yes", 1, 0),
+    anycoping = factor(anycoping, labels = c("No", "Yes")),
+    # Moderate/Severe burden (Diana, 2-10-22)
+    #burden_high = ifelse(burden >= 0.06, 1, 0),
+    #burden_high = factor(burden_high, labels = c("No","Yes (6% or more)")),
+    # Jenn - 2-11-22
+    #any_combined = ifelse(anyphysical=="Yes" | anycoping=="Yes" | burden_high=="Yes (6% or more)", 1, 0),
+    #any_combined = factor(any_combined, labels=c("No","Yes")),
+    # Jenn - 2-11-22 - DO NOT CONSIDER SINGLE PANE WINDOW (Diana, Zoom meeting 4-14-22)
+    #any_combined_2 = ifelse(anyphysical_2=="Yes" | anycoping=="Yes" | burden_high=="Yes (6% or more)", 1, 0),
+    #any_combined_2 = factor(any_combined_2, labels=c("No","Yes")),
+    
+    # Householder race (Jenn 2-18-22)
+    hh_head = ifelse(HOUSEHOLDER_RACE==1 & SDESCENT==0, 1, 0),
+    hh_head = replace(hh_head, HOUSEHOLDER_RACE==2 & SDESCENT==0, 2),
+    hh_head = replace(hh_head, SDESCENT==1, 3),
+    hh_head = replace(hh_head, HOUSEHOLDER_RACE>=3 & SDESCENT==0, 4),
+    hh_head = factor(hh_head, labels=c("NH White","NH Black","Hispanic","Other")),
+    
+    # Education (Jenn 2-18-22)
+    education = EDUCATION,
+    education = replace(education, EDUCATION==5, 4),
+    education = factor(education, labels=c("Less HS","HS diploma","Some college","College degree")),
+    
+    # HH composition (Jenn 2-18-22)
+    anychild = ifelse(NUMCHILD > 0, 1, 0),
+    anychild = factor(anychild, labels=c("No","Yes")), 
+    
+    hh64yrs = ifelse(HHAGE>64, 1, 0),
+    hh64yrs = factor(hh64yrs, labels=c("No","Yes")), 
+    
+    nochildHH64 = ifelse(anychild=="No" & hh64yrs=="No" , 1, 0),
+    nochildHH64 = factor(nochildHH64, labels=c("No","Yes")),
+    
+    ## typehuq (Jenn 2-18-22)
+    typehuq = factor(TYPEHUQ, labels=c("Mobile home","Single detached","Single attached","Building 2-4 units","Building 5 or more units")),
+    
+    # Heatfuel (Jenn 2-18-22)
+    fuelheat = ifelse(FUELHEAT==1, 1, 0),
+    fuelheat = replace(fuelheat, FUELHEAT==5, 2),
+    fuelheat = replace(fuelheat, FUELHEAT %in% c(2,3,7,99), 3),
+    fuelheat = na_if(fuelheat, FUELHEAT==-2),
+    fuelheat = factor(fuelheat, labels=c("Natural gas","Electricity","Other","Not applicable")),
+    
+    # Energy sources (Jenn 2-18-22)
+    useel = factor(USEEL, labels=c("Yes")), #Electricity used (No 0 is available)
+    usesolar = factor(USESOLAR, labels=c("No","Yes")), # Solar used
+    useng = factor(USENG, labels=c("No","Yes")), # Natural gas used
+    uselp = factor(USELP, labels=c("No","Yes")), # Propane used
+    usefo = factor(USEFO, labels=c("No","Yes")), # Fuel oil used
+    #wdpellet = factor(WDPELLET, labels=c("Not applicable","No","Yes")), # Wood pellets used - not in 2020
+    
+    # Year housing unit built (Jenn 2-18-22)
+    hbuilt = ifelse(YEARMADERANGE<=4, 1, 2),
+    hbuilt = factor(hbuilt, labels=c("Built before 1980","Build at or after 1980")),
+    
+    # Housing tenure (Jenn 2-18-22)
+    kownrent = ifelse(KOWNRENT==1,1,2),
+    kownrent = factor(kownrent, labels=c("Owned","Rent or occupied")),
+    
+    # Population density (Jenn 2-18-22)
+    uatyp10 = ifelse(UATYP10=="R",2,1),
+    uatyp10 = factor(uatyp10, labels=c("Urban","Rural")),
+    
+    # Region (Jenn 2-18-22)
+    regionc = factor(REGIONC, labels=c("Midwest","Northeast","South","West")), # STOP HERE
+    
+    # Type of air conditioning - NOT IN 2020 RECS
+    #cooltype = factor(COOLTYPE, levels = c(1,2,3,-2), labels=c("Central","Unit","Both","No air")),
+    
+    # Energy Assistance
+    energyasst = factor(ENERGYASST, labels=c("No","Yes")),
+    
+    # Any of three: Physical, coping, financial
+    #anythree = ifelse(anycoping=="Yes" | anyphysical=="Yes" | burden_high=="Yes (6% or more)", 1, 0),
+    #anythree = factor(anythree, labels=c("No","Yes")),
+    
+    # Any of three: Physical (Omit single pane window variable), coping, financial
+    #anythree_2 = ifelse(anycoping=="Yes" | anyphysical_2=="Yes" | burden_high=="Yes (6% or more)", 1, 0),
+    #anythree_2 = factor(anythree_2, labels=c("No","Yes")),
+    
+    
+    # Any disconnection notice: Jenn (2-28-2022)
+    scalee = ifelse(SCALEE>0, 1, 0),
+    scalee = factor(scalee, labels=c("No","Yes")),
+    
+    # Any disconnection: Jenn (2-28-2022)
+    anydisconn = ifelse(NOHEATEL==1 | NOHEATNG==1 | NOHEATBULK==1 | NOACEL==1, 1, 0),
+    anydisconn = factor(anydisconn, labels=c("No","Yes")),
+    
+    # Any discomfort: Jenn (2-28-2022)
+    discomfort = ifelse((TEMPHOME>=0 & TEMPHOME<=67) | TEMPHOME>=82 |
+                          (TEMPHOMEAC>=0 & TEMPHOMEAC<=67) | 
+                          TEMPHOMEAC>=82 | NOHEATDAYS>0 | NOACDAYS>0, 1, 0),
+    discomfort = factor(discomfort, labels=c("No", "Yes")),
+    
+    # Any medical attention: Jenn (2-28-2022)
+    anymedical = ifelse(COLDMA==1 | HOTMA==1, 1, 0),
+    anymedical = factor(anymedical, labels=c("No","yes")),
+    
+    # New definitions (Jenn - 5-24-2022)
+    #physical_only = ifelse(anyphysical=="Yes" & anycoping=="No" & burden_high=="No",1, 0),
+    #physical_only = factor(physical_only, labels=c("No", "Yes")),
+    #coping_only = ifelse(anyphysical=="No" & anycoping=="Yes" & burden_high=="No",1, 0),
+    #coping_only = factor(coping_only, labels=c("No", "Yes")),
+    #econo_only = ifelse(anyphysical=="No" & anycoping=="No" & burden_high=="Yes (6% or more)",1, 0),
+    #econo_only = factor(econo_only, labels=c("No", "Yes")),
+    #physical_coping = ifelse(anyphysical=="Yes" & anycoping=="Yes" & burden_high=="No",1, 0),
+    #physical_coping = factor(physical_coping, labels=c("No", "Yes")),
+    #physical_econo = ifelse(anyphysical=="Yes" & anycoping=="No" & burden_high=="Yes (6% or more)",1, 0),
+    #physical_econo = factor(physical_econo, labels=c("No", "Yes")),
+    #coping_econo = ifelse(anyphysical=="No" & anycoping=="Yes" & burden_high=="Yes (6% or more)",1, 0),
+    #coping_econo = factor(coping_econo, labels=c("No", "Yes")),
+    #physical_coping_econo = ifelse(anyphysical=="Yes" & anycoping=="Yes" & burden_high=="Yes (6% or more)",1, 0),
+    #physical_coping_econo = factor(physical_coping_econo, labels=c("No", "Yes")),
+    #no_ei = ifelse(anyphysical=="No" & anycoping=="No" & burden_high=="No",1, 0),
+    #no_ei = factor(no_ei, labels=c("No", "Yes")),
+    
+    #physical_only2 = ifelse(anyphysical_2=="Yes" & anycoping=="No" & burden_high=="No",1, 0),
+    #physical_only2 = factor(physical_only2, labels=c("No", "Yes")),
+    #coping_only2 = ifelse(anyphysical_2=="No" & anycoping=="Yes" & burden_high=="No",1, 0),
+    #coping_only2 = factor(coping_only2, labels=c("No", "Yes")),
+    #econo_only2 = ifelse(anyphysical_2=="No" & anycoping=="No" & burden_high=="Yes (6% or more)",1, 0),
+    #econo_only2 = factor(econo_only2, labels=c("No", "Yes")),
+    #physical_coping2 = ifelse(anyphysical_2=="Yes" & anycoping=="Yes" & burden_high=="No",1, 0),
+    #physical_coping2 = factor(physical_coping2, labels=c("No", "Yes")),
+    #physical_econo2 = ifelse(anyphysical_2=="Yes" & anycoping=="No" & burden_high=="Yes (6% or more)",1, 0),
+    #physical_econo2 = factor(physical_econo2, labels=c("No", "Yes")),
+    #coping_econo2 = ifelse(anyphysical_2=="No" & anycoping=="Yes" & burden_high=="Yes (6% or more)",1, 0),
+    #coping_econo2 = factor(coping_econo2, labels=c("No", "Yes")),
+    #physical_coping_econo2 = ifelse(anyphysical_2=="Yes" & anycoping=="Yes" & burden_high=="Yes (6% or more)",1, 0),
+    #physical_coping_econo2 = factor(physical_coping_econo2, labels=c("No", "Yes")),
+    #no_ei2 = ifelse(anyphysical_2=="No" & anycoping=="No" & burden_high=="No",1, 0),
+    #no_ei2 = factor(no_ei2, labels=c("No", "Yes"))
+    
+  )

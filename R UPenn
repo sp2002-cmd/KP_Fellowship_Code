@@ -1,0 +1,515 @@
+# # Update the gt package
+# remotes::install_github("rstudio/gt")
+# install.packages("remotes")
+
+# Import Data
+subject <- read_csv("data/respiratory_microbiome/mira_subject_prior.csv")
+subject
+
+subject_summary <- read_csv("data/respiratory_microbiome/mira_subject_summary.csv")
+
+d_mdi <- read_csv("data/respiratory_microbiome/d_mdi_outcome_restricted.csv")
+d_mdi |> 
+  count(subject_id)
+
+
+# Focus on describing outcome variable: Diversity on Day 0
+diversity_outcome_data <- d_mdi |> 
+  select(subject_id, subject_day, shannon)
+
+# Shannon diversity mean across each subject_id
+diversity_outcome_data %>% 
+  group_by(subject_id) %>%
+  summarise(mean_shannon = mean(shannon, na.rm = TRUE))
+  
+  gtsummary::tbl_summary(diversity_outcome_data, by = subject_id) %>%
+    add_overall() %>%
+    add_p()
+  
+# just day 0...
+diversity_outcome_data0 <- diversity_outcome_data |> 
+  group_by(subject_id) |> 
+  filter(subject_day == min(subject_day)) |> 
+  ungroup() |> 
+  filter(subject_id %in% unique(d_mdi$subject_id))
+
+# just day 27...
+diversity_outcome_data27 <- diversity_outcome_data |> 
+  group_by(subject_id) |> 
+  filter(subject_day == "27") |> 
+  ungroup() |> 
+  filter(subject_id %in% unique(d_mdi$subject_id))
+
+# just day 28...
+diversity_outcome_data28 <- diversity_outcome_data |> 
+  group_by(subject_id) |> 
+  filter(subject_day == "28") |> 
+  ungroup() |> 
+  filter(subject_id %in% unique(d_mdi$subject_id))
+
+# just day 29...
+diversity_outcome_data29 <- diversity_outcome_data |> 
+  group_by(subject_id) |> 
+  filter(subject_day == max(subject_day)) |> 
+  ungroup() |> 
+  filter(subject_id %in% unique(d_mdi$subject_id))
+
+# Change in Diversity
+diversity_merged <- merge(diversity_outcome_data0, diversity_outcome_data29, by = "subject_id") |>
+  mutate(diversity_merged, "Change in Diversity" = shannon.y - shannon.x)
+
+
+# Multiple spaghetti plot-combined
+ggplot(diversity_outcome_data, aes(x=subject_day, y=shannon)) +
+  geom_line() +
+  facet_wrap(~subject_id)
+
+# Multiple scatter plots-combined
+ggplot(diversity_outcome_data, aes(x=subject_day, y=shannon)) +
+  geom_point() +
+  geom_smooth(method = "lm") +
+  facet_wrap(~subject_id)
+`````
+#' respiratory Shannon data
+table1_data <- read_csv("data/table1_data.csv")
+table1_data
+
+resp_shannon <- read_csv("data/respiratory_microbiome/d_mdi_outcome_restricted.csv")
+resp_shannon |> 
+  count(subject_id)
+
+abx <- read_csv("data/antibiotics/abx_ltach_dates.csv.gz")
+abx
+
+  
+# just day 0...
+resp_shannon |> 
+  filter(subject_id %in% table1_data$subject_id) |>
+  group_by(subject_id) |> 
+  filter(subject_day == min(subject_day)) |> 
+  ungroup() |> 
+  select(subject_id, shannon) -> resp_shannon_day0
+resp_shannon_day0
+
+  
+# boxplot: any antibiotic
+table1_data |> 
+  left_join(resp_shannon_day0, by = "subject_id") |> 
+  #glimpse()
+  ggplot(data = _, aes(x = any_antibiotic_before0_7, y = shannon, fill = any_antibiotic_before0_7)) +
+  geom_boxplot() +
+  scale_fill_viridis_d(option = "plasma") +
+  theme_bw() +
+  theme(legend.position = "none") +
+  theme(axis.text.x = element_text(color = "black", size = 8), axis.text.y = element_text(color = "black"), legend.text = element_text(size = 6)) +
+  labs(x = "", y = "Respiratory Bacterial Community Shannon\nDiversity (base e) on Admission (Day 0)", fill = "") -> p_resp_diversity_abx_any_boxplot
+p_resp_diversity_abx_any_boxplot
+
+p_resp_diversity_abx_any_boxplot |> 
+  ggsave(plot = _, filename = "figs/p_resp_diversity_abx_any_boxplot.png", height = 4, width = 6, units = "in", dpi = 600)
+
+
+#' linear model: any antibiotic - univariable
+table1_data |> 
+  left_join(resp_shannon_day0, by = "subject_id") |> 
+  mutate(any_abx_yn = any_antibiotic_before0_7 == "Antibiotics within 7 Days Prior to Admission") |> 
+  identity() |> 
+  lm(data = _, formula = shannon ~ any_abx_yn) |> 
+  broom::tidy(conf.int = TRUE)
+
+table1_data |> 
+  left_join(resp_shannon_day0, by = "subject_id") |> 
+  identity() |> 
+  mutate(any_abx_yn = any_antibiotic_before0_7 == "Antibiotics within 7 Days Prior to Admission") |> 
+  lm(data = _, formula = shannon ~ any_abx_yn) |> 
+  gtsummary::tbl_regression()
+
+
+
+#' EVALUATE FOR CONFOUNDING...
+#' linear model: any antibiotic - univariable 
+#' ADJUSTED MODEL: ADD POTENTIAL FOR CONFOUNDING BY DURATION OF PRIOR HOSPITALIZATION
+table1_data |> 
+  left_join(resp_shannon_day0, by = "subject_id") |> 
+  mutate(any_abx_yn = any_antibiotic_before0_7 == "Antibiotics within 7 Days Prior to Admission") |> 
+  rename(prior_hosp_days = `Number of Hospital Days Before Enrollment`) |> 
+  identity() |> 
+  lm(data = _, formula = shannon ~ any_abx_yn + prior_hosp_days) |> 
+  broom::tidy(conf.int = TRUE)
+
+table1_data |> 
+  left_join(resp_shannon_day0, by = "subject_id") |> 
+  mutate(any_abx_yn = any_antibiotic_before0_7 == "Antibiotics within 7 Days Prior to Admission") |> 
+  rename(prior_hosp_days = `Number of Hospital Days Before Enrollment`) |> 
+  identity() |> 
+  lm(data = _, formula = shannon ~ any_abx_yn + prior_hosp_days) |> 
+  gtsummary::tbl_regression()
+
+
+
+
+
+# boxplot: detailed antibiotics
+table1_data |> 
+  left_join(resp_shannon_day0, by = "subject_id") |> 
+  select(subject_id, shannon, contains("_ABX")) |> 
+  pivot_longer(cols = c(-subject_id, -shannon), names_to = "antibiotic", values_to = "antibiotic_administered") |> 
+  mutate(antibiotic = gsub("_ABX","",antibiotic),
+         antibiotic = gsub("_","-",antibiotic)) |>
+  #glimpse()
+  ggplot(data = _, aes(x = antibiotic_administered, y = shannon, fill = antibiotic)) +
+  geom_boxplot() +
+  scale_fill_viridis_d(option = "turbo") +
+  facet_wrap(facets = ~ antibiotic) +
+  theme_bw() +
+  theme(axis.text.x = element_text(color = "black"), axis.text.y = element_text(color = "black"), legend.text = element_text(size = 6)) +
+  theme(legend.position = "none") +
+  labs(x = "Antibiotic Administered within 7 Days of Admission", y = "Respiratory Bacterial Community Shannon\nDiversity (base e) on Admission (Day 0)", fill = "") -> p_resp_diversity_abx_detail_boxplot
+p_resp_diversity_abx_detail_boxplot
+
+p_resp_diversity_abx_detail_boxplot |> 
+  ggsave(plot = _, filename = "figs/p_resp_diversity_abx_detail_boxplot.png", height = 6, width = 8, units = "in", dpi = 600)
+
+
+#' linear model: detailed antibiotic - univariable regression
+table1_data |> 
+  left_join(resp_shannon_day0, by = "subject_id") |> 
+  select(subject_id, shannon, contains("_ABX")) |> 
+  pivot_longer(cols = c(-subject_id, -shannon), names_to = "antibiotic", values_to = "antibiotic_administered") |> 
+  mutate(antibiotic = gsub("_ABX","",antibiotic),
+         antibiotic = gsub("_","-",antibiotic)) |>
+  group_by(antibiotic) |> 
+  nest() |> 
+  mutate(lm_antibiotic = map(.x = data, .f = ~ broom::tidy(lm(data = .x, formula = shannon ~ antibiotic_administered), conf.int = TRUE))) |> 
+  select(antibiotic, lm_antibiotic) |> 
+  unnest() |> 
+  identity() -> resp_shannon_lm_antibiotic_univariable
+resp_shannon_lm_antibiotic_univariable
+
+resp_shannon_lm_antibiotic_univariable |> 
+  #count(term)
+  filter(term == "antibiotic_administeredTRUE") |> 
+  ggplot(data = _) +
+  geom_vline(xintercept = 0, color = "black", linetype = 2) +
+  geom_segment(aes(x = conf.low, xend = conf.high, y = antibiotic, yend = antibiotic, color = antibiotic)) +
+  geom_point(aes(x = estimate, y = antibiotic, color = antibiotic), shape = 21) +
+  scale_color_viridis_d(option = "turbo") +
+  scale_y_discrete(limits = rev) +
+  theme_bw() +
+  theme(legend.position = "none") +
+  labs(x = "Effect of Antibiotic on Respiratory Shannon Diversity (95% CI)\n(Univariable Models)", y = "") -> p_resp_shannon_lm_antibiotic_univariable
+p_resp_shannon_lm_antibiotic_univariable
+
+p_resp_shannon_lm_antibiotic_univariable |> 
+  ggsave(plot = _, filename = "figs/p_resp_shannon_lm_antibiotic_univariable.png", height = 6, width = 8, units = "in", dpi = 600)
+
+
+#' linear model: detailed antibiotic - multivariable regression
+table1_data |> 
+  left_join(resp_shannon_day0, by = "subject_id") |> 
+  select(subject_id, shannon, contains("_ABX")) |> 
+  pivot_longer(cols = c(-subject_id, -shannon), names_to = "antibiotic", values_to = "antibiotic_administered") |> 
+  mutate(antibiotic = gsub("_ABX","",antibiotic),
+         antibiotic = gsub("_","-",antibiotic)) |>
+  distinct() |> 
+  pivot_wider(id_cols = c(subject_id, shannon), names_from = antibiotic, values_from = antibiotic_administered) |> 
+  select(-subject_id) |> 
+  identity() |> 
+  lm(data = _, formula = shannon ~ .) |> 
+  broom::tidy(conf.int = TRUE) -> resp_shannon_lm_antibiotic_multivariable
+resp_shannon_lm_antibiotic_multivariable
+
+resp_shannon_lm_antibiotic_multivariable |> 
+  filter(term != "(Intercept)") |> 
+  mutate(term = gsub("TRUE","",term)) |> 
+  mutate(term = gsub("`","",term)) |> 
+  rename(antibiotic = term) |> 
+  ggplot(data = _) +
+  geom_vline(xintercept = 0, color = "black", linetype = 2) +
+  geom_segment(aes(x = conf.low, xend = conf.high, y = antibiotic, yend = antibiotic, color = antibiotic)) +
+  geom_point(aes(x = estimate, y = antibiotic, color = antibiotic), shape = 21) +
+  scale_color_viridis_d(option = "turbo") +
+  scale_y_discrete(limits = rev) +
+  theme_bw() +
+  theme(legend.position = "none") +
+  labs(x = "Effect of Antibiotic on Respiratory Shannon Diversity (95% CI)\n(Multivariable Model)", y = "") -> p_resp_shannon_lm_antibiotic_multivariable
+p_resp_shannon_lm_antibiotic_multivariable
+
+p_resp_shannon_lm_antibiotic_multivariable |> 
+  ggsave(plot = _, filename = "figs/p_resp_shannon_lm_antibiotic_multivariable.png", height = 6, width = 8, units = "in", dpi = 600)
+
+``````
+# Import Data
+d_mdi <- read_csv("data/respiratory_microbiome/d_mdi_outcome_restricted.csv")
+d_mdi |> 
+  count(subject_id)
+
+subject <- read_csv("data/respiratory_microbiome/mira_subject_prior.csv") |> 
+    filter(subject_id %in% unique(d_mdi$subject_id))
+subject
+
+subject_summary <- read_csv("data/respiratory_microbiome/mira_subject_summary.csv") |> 
+    filter(subject_id %in% unique(d_mdi$subject_id))
+subject_summary
+
+table1_data <- read_csv("data/table1_data.csv")
+table1_data
+
+
+# Focus on describing outcome variable: Diversity on Day 0
+diversity_outcome_data <- d_mdi |> 
+  select(subject_id, subject_day, shannon)
+
+# Shannon diversity mean across each subject_id
+diversity_outcome_data %>% 
+  group_by(subject_id) %>%
+  summarise(mean_shannon = mean(shannon, na.rm = TRUE))
+
+diversity_outcome_data %>% 
+  group_by(subject_id) %>%
+  summarise(mean_shannon = mean(shannon, na.rm = TRUE)) |> 
+  gt()
+
+gtsummary::tbl_summary(diversity_outcome_data, by = subject_id) %>%
+  add_overall() %>%
+  add_p()
+  
+# just day 0...
+diversity_outcome_data0 <- diversity_outcome_data |> 
+  group_by(subject_id) |> 
+  filter(subject_day == min(subject_day)) |> 
+  ungroup() |> 
+  filter(subject_id %in% unique(d_mdi$subject_id))
+
+# just day 27...
+diversity_outcome_data27 <- diversity_outcome_data |> 
+  group_by(subject_id) |> 
+  filter(subject_day == "27") |> 
+  ungroup() |> 
+  filter(subject_id %in% unique(d_mdi$subject_id))
+
+# just day 28...
+diversity_outcome_data28 <- diversity_outcome_data |> 
+  group_by(subject_id) |> 
+  filter(subject_day == "28") |> 
+  ungroup() |> 
+  filter(subject_id %in% unique(d_mdi$subject_id))
+
+# just day 29...
+diversity_outcome_data29 <- diversity_outcome_data |> 
+  group_by(subject_id) |> 
+  filter(subject_day == max(subject_day)) |> 
+  ungroup() |> 
+  filter(subject_id %in% unique(d_mdi$subject_id))
+
+# Change in Diversity
+diversity_merged <- merge(diversity_outcome_data0, diversity_outcome_data29, by = "subject_id") |>
+  mutate("Change in Diversity" = shannon.y - shannon.x)
+
+
+# Multiple spaghetti plot-combined
+ggplot(diversity_outcome_data, aes(x=subject_day, y=shannon)) +
+  geom_line() +
+  facet_wrap(~subject_id)
+
+# Multiple scatter plots-combined
+ggplot(diversity_outcome_data, aes(x=subject_day, y=shannon)) +
+  geom_point() +
+  geom_smooth(method = "lm") +
+  facet_wrap(~subject_id, scales = "free")
+
+  
+# Boxplot: Any antibiotic
+table1_data |> 
+  left_join(diversity_outcome_data0, by = "subject_id") |> 
+  #glimpse()
+  ggplot(data = _, aes(x = any_antibiotic_before0_7, y = shannon, fill = any_antibiotic_before0_7)) +
+  geom_boxplot() +
+  scale_fill_viridis_d(option = "plasma") +
+  theme_bw() +
+  theme(legend.position = "bottom") +
+  labs(x = "", y = "Shannon Diversity (base e)\n on Admission (Day 0)", fill = "")
+
+
+# Boxplot: Any antibiotic
+table1_data |> 
+  left_join(diversity_outcome_data0, by = "subject_id") |> 
+  select(subject_id, shannon, contains("_ABX")) |> 
+  pivot_longer(cols = c(-subject_id, -shannon), names_to = "antibiotic", values_to = "antibiotic_administered") |> 
+  #glimpse()
+  ggplot(data = _, aes(x = antibiotic_administered, y = shannon, fill = antibiotic)) +
+  geom_boxplot() +
+  scale_fill_viridis_d(option = "plasma") +
+  facet_wrap(facets = ~ antibiotic) +
+  theme_bw() +
+  theme(legend.position = "bottom") +
+  labs(x = "", y = "Shannon Diversity (base e)", fill = "")
+
+```````
+#' gut Shannon data
+table1_data <- read_csv("data/table1_data.csv")
+table1_data
+
+stool_shannon <- read_csv("data/gut_microbiome/mira_stool_shannon.csv.gz") |>
+    group_by(subject_id) |> 
+    mutate(subject_day = as.numeric(collection_date - min(collection_date, na.rm = TRUE))) |>
+    ungroup() |> 
+    filter(grepl("MIRA", subject_id)) 
+stool_shannon
+
+abx <- read_csv("data/antibiotics/abx_ltach_dates.csv.gz")
+abx
+
+
+
+#' gut Shannon data ... just day 0...
+stool_shannon |> 
+  group_by(subject_id) |> 
+  filter(subject_day == min(subject_day)) |> 
+  ungroup() |> 
+  filter(subject_id %in% unique(table1_data$subject_id)) |>
+  identity() -> stool_shannon_day0
+stool_shannon_day0
+
+
+#' boxplot: any antibiotic
+table1_data |> 
+  left_join(stool_shannon_day0, by = "subject_id") |> 
+  #glimpse()
+  ggplot(data = _, aes(x = any_antibiotic_before0_7, y = shannon, fill = any_antibiotic_before0_7)) +
+  geom_boxplot() +
+  scale_fill_viridis_d(option = "plasma") +
+  theme_bw() +
+  theme(legend.position = "none") +
+  theme(axis.text.x = element_text(color = "black", size = 7), axis.text.y = element_text(color = "black"), legend.text = element_text(size = 6)) +
+  labs(x = "", y = "Gut Bacterial Community Shannon\nDiversity (base e) on Admission (Day 0)", fill = "") -> p_gut_diversity_abx_any_boxplot
+p_gut_diversity_abx_any_boxplot
+
+p_gut_diversity_abx_any_boxplot |> 
+  ggsave(plot = _, filename = "figs/p_gut_diversity_abx_any_boxplot.png", height = 4, width = 6, units = "in", dpi = 600)
+
+
+#' linear model: any antibiotic - univariable
+table1_data |> 
+  left_join(stool_shannon_day0, by = "subject_id") |> 
+  mutate(any_abx_yn = any_antibiotic_before0_7 == "Antibiotics within 7 Days Prior to Admission") |> 
+  identity() |> 
+  lm(data = _, formula = shannon ~ any_abx_yn) |> 
+  broom::tidy(conf.int = TRUE)
+
+table1_data |> 
+  left_join(stool_shannon_day0, by = "subject_id") |> 
+  identity() |> 
+  mutate(any_abx_yn = any_antibiotic_before0_7 == "Antibiotics within 7 Days Prior to Admission") |> 
+  lm(data = _, formula = shannon ~ any_abx_yn) |> 
+  gtsummary::tbl_regression()
+
+
+#' EVALUATE FOR CONFOUNDING...
+#' linear model: any antibiotic - univariable 
+#' ADJUSTED MODEL: ADD POTENTIAL FOR CONFOUNDING BY DURATION OF PRIOR HOSPITALIZATION
+table1_data |> 
+  left_join(stool_shannon_day0, by = "subject_id") |> 
+  mutate(any_abx_yn = any_antibiotic_before0_7 == "Antibiotics within 7 Days Prior to Admission") |> 
+  rename(prior_hosp_days = `Number of Hospital Days Before Enrollment`) |> 
+  identity() |> 
+  lm(data = _, formula = shannon ~ any_abx_yn + prior_hosp_days) |> 
+  broom::tidy(conf.int = TRUE)
+
+table1_data |> 
+  left_join(stool_shannon_day0, by = "subject_id") |> 
+  mutate(any_abx_yn = any_antibiotic_before0_7 == "Antibiotics within 7 Days Prior to Admission") |> 
+  rename(prior_hosp_days = `Number of Hospital Days Before Enrollment`) |> 
+  identity() |> 
+  lm(data = _, formula = shannon ~ any_abx_yn + prior_hosp_days) |> 
+  gtsummary::tbl_regression()
+
+
+
+# boxplot: detailed antibiotics
+table1_data |> 
+  left_join(stool_shannon_day0, by = "subject_id") |> 
+  select(subject_id, shannon, contains("_ABX")) |> 
+  pivot_longer(cols = c(-subject_id, -shannon), names_to = "antibiotic", values_to = "antibiotic_administered") |> 
+  mutate(antibiotic = gsub("_ABX","",antibiotic),
+         antibiotic = gsub("_","-",antibiotic)) |>
+  #glimpse()
+  ggplot(data = _, aes(x = antibiotic_administered, y = shannon, fill = antibiotic)) +
+  geom_boxplot() +
+  scale_fill_viridis_d(option = "turbo") +
+  facet_wrap(facets = ~ antibiotic) +
+  theme_bw() +
+  theme(axis.text.x = element_text(color = "black"), axis.text.y = element_text(color = "black"), legend.text = element_text(size = 6)) +
+  theme(legend.position = "none") +
+  labs(x = "Antibiotic Administered within 7 Days of Admission", y = "Gut Bacterial Community Shannon\nDiversity (base e) on Admission (Day 0)", fill = "") -> p_gut_diversity_abx_detail_boxplot
+p_gut_diversity_abx_detail_boxplot
+
+p_gut_diversity_abx_detail_boxplot |> 
+  ggsave(plot = _, filename = "figs/p_gut_diversity_abx_detail_boxplot.png", height = 6, width = 8, units = "in", dpi = 600)
+
+
+#' linear model: detailed antibiotic - univariable regression
+table1_data |> 
+  left_join(stool_shannon_day0, by = "subject_id") |> 
+  select(subject_id, shannon, contains("_ABX")) |> 
+  pivot_longer(cols = c(-subject_id, -shannon), names_to = "antibiotic", values_to = "antibiotic_administered") |> 
+  mutate(antibiotic = gsub("_ABX","",antibiotic),
+         antibiotic = gsub("_","-",antibiotic)) |>
+  group_by(antibiotic) |> 
+  nest() |> 
+  mutate(lm_antibiotic = map(.x = data, .f = ~ broom::tidy(lm(data = .x, formula = shannon ~ antibiotic_administered), conf.int = TRUE))) |> 
+  select(antibiotic, lm_antibiotic) |> 
+  unnest() |> 
+  identity() -> stool_shannon_lm_antibiotic_univariable
+stool_shannon_lm_antibiotic_univariable
+
+stool_shannon_lm_antibiotic_univariable |> 
+  #count(term)
+  filter(term == "antibiotic_administeredTRUE") |> 
+  ggplot(data = _) +
+  geom_vline(xintercept = 0, color = "black", linetype = 2) +
+  geom_segment(aes(x = conf.low, xend = conf.high, y = antibiotic, yend = antibiotic, color = antibiotic)) +
+  geom_point(aes(x = estimate, y = antibiotic, color = antibiotic), shape = 21) +
+  scale_color_viridis_d(option = "turbo") +
+  scale_y_discrete(limits = rev) +
+  theme_bw() +
+  theme(legend.position = "none") +
+  labs(x = "Effect of Antibiotic on Gut Shannon Diversity (95% CI)\n(Univariable Models)", y = "") -> p_stool_shannon_lm_antibiotic_univariable
+p_stool_shannon_lm_antibiotic_univariable
+
+p_stool_shannon_lm_antibiotic_univariable |> 
+  ggsave(plot = _, filename = "figs/p_stool_shannon_lm_antibiotic_univariable.png", height = 6, width = 8, units = "in", dpi = 600)
+
+
+#' linear model: detailed antibiotic - multivariable regression
+table1_data |> 
+  left_join(stool_shannon_day0, by = "subject_id") |> 
+  select(subject_id, shannon, contains("_ABX")) |> 
+  pivot_longer(cols = c(-subject_id, -shannon), names_to = "antibiotic", values_to = "antibiotic_administered") |> 
+  mutate(antibiotic = gsub("_ABX","",antibiotic),
+         antibiotic = gsub("_","-",antibiotic)) |>
+  pivot_wider(id_cols = c(subject_id, shannon), names_from = antibiotic, values_from = antibiotic_administered) |> 
+  select(-subject_id) |> 
+  identity() |> 
+  lm(data = _, formula = shannon ~ .) |> 
+  broom::tidy(conf.int = TRUE) -> stool_shannon_lm_antibiotic_multivariable
+stool_shannon_lm_antibiotic_multivariable
+
+stool_shannon_lm_antibiotic_multivariable |> 
+  filter(term != "(Intercept)") |> 
+  mutate(term = gsub("TRUE","",term)) |> 
+  mutate(term = gsub("`","",term)) |> 
+  rename(antibiotic = term) |> 
+  ggplot(data = _) +
+  geom_vline(xintercept = 0, color = "black", linetype = 2) +
+  geom_segment(aes(x = conf.low, xend = conf.high, y = antibiotic, yend = antibiotic, color = antibiotic)) +
+  geom_point(aes(x = estimate, y = antibiotic, color = antibiotic), shape = 21) +
+  scale_color_viridis_d(option = "turbo") +
+  scale_y_discrete(limits = rev) +
+  theme_bw() +
+  theme(legend.position = "none") +
+  labs(x = "Effect of Antibiotic on Gut Shannon Diversity (95% CI)\n(Multivariable Model)", y = "") -> p_stool_shannon_lm_antibiotic_multivariable
+p_stool_shannon_lm_antibiotic_multivariable
+
+p_stool_shannon_lm_antibiotic_multivariable |> 
+  ggsave(plot = _, filename = "figs/p_stool_shannon_lm_antibiotic_multivariable.png", height = 6, width = 8, units = "in", dpi = 600)

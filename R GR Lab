@@ -13,6 +13,163 @@ library(ggpubr)
 library(gridExtra)
 
 ```
+## R Markdown
+
+```{r setup, include=FALSE, echo=FALSE}
+# Set CRAN mirror
+options(repos = c(CRAN = "https://cran.rstudio.com"))
+
+# Install required packages if not already installed
+if (!requireNamespace("ggplot2", quietly = TRUE)) {
+  install.packages("ggplot2")
+}
+
+# Load the ggplot2 package
+library(ggplot2)
+
+```
+
+#Load dataset
+```{r, echo=FALSE}
+library(readr)
+TOPSTeensAndOpioidUs <- read_csv("TOPSTeensAndOpioidUs_DATA_LABELS_2024-06-26_1405.csv")
+install.packages("ggplot2")
+library(tidyverse)
+library(ggplot2)
+
+```
+
+
+#Parent Sex
+```{r, echo=FALSE}
+ggplot(data = TOPSTeensAndOpioidUs) + geom_bar(mapping = aes(x = `What sex were you assigned at birth?`), fill = "#8C1515") +
+  labs(title = "What sex were you assigned at birth?", x = "", y = "Count") + theme(panel.background = element_rect(fill = "white", color = NA), panel.border = element_rect(color = "black", fill = NA, size = .5), panel.grid.major = element_line(color = "grey80", size = .5),
+    panel.grid.minor = element_line(color = "grey80", size = .5))
+
+```
+
+#Parent, hispanic or latino ethnic background
+```{r, echo=FALSE}
+ggplot(data = TOPSTeensAndOpioidUs) + geom_bar(mapping = aes(x = `Do you identify as having a Hispanic or Latino ethnic background?`), fill = "#8C1515") +
+  labs(title = "Do you identify as having a Hispanic or Latino ethnic background?", x = "", y = "Count") + theme(panel.background = element_rect(fill = "white", color = NA), panel.border = element_rect(color = "black", fill = NA, size = .5), panel.grid.major = element_line(color = "grey80", size = .5),
+    panel.grid.minor = element_line(color = "grey80", size = .5))
+
+```
+
+#Parent race
+```{r, echo=FALSE}
+TOPSTeensAndOpioidUsPRace <- TOPSTeensAndOpioidUs %>%
+  mutate(Race = case_when(
+    `What best describes your race? (select all that apply) (choice=American Indian/Alaska Native)` == "Checked" ~ "American Indian/Alaska Native",
+    `What best describes your race? (select all that apply) (choice=Asian)` == "Checked" ~ "Asian",
+    `What best describes your race? (select all that apply) (choice=Black or African American)` == "Checked" ~ "Black or African American",
+    `What best describes your race? (select all that apply) (choice=Native Hawaiian or Other Pacific Islander)` == "Checked" ~ "Native Hawaiian or Other Pacific Islander",
+    `What best describes your race? (select all that apply) (choice=White)` == "Checked" ~ "White",
+    `What best describes your race? (select all that apply) (choice=Other)` == "Checked" ~ "Other",
+    TRUE ~ NA_character_
+  ))  %>%
+  mutate(Race = factor(Race, levels = c("American Indian/Alaska Native", "Asian", "Black or African American", "Native Hawaiian or Other Pacific Islander", "White", "Other", NA_character_)))
+ggplot(data = TOPSTeensAndOpioidUsPRace) + geom_bar(mapping = aes(x = Race), fill = "#8C1515") +
+  labs(title = "Parent's Race", x = "", y = "Count") + theme(panel.background = element_rect(fill = "white", color = NA), panel.border = element_rect(color = "black", fill = NA, size = .5), panel.grid.major = element_line(color = "grey80", size = .5),
+    panel.grid.minor = element_line(color = "grey80", size = .5))
+
+```
+
+
+#Child hispanic or latino ethnic background
+```{r, echo=FALSE}
+ggplot(data = TOPSTeensAndOpioidUs) + geom_bar(mapping = aes(x = `Does your child identify as having a Hispanic or Latino ethnic background?`), fill = "#8C1515") +
+  labs(title = "Does your child identify as having a Hispanic or Latino ethnic background?", x = "", y = "Count") + theme(panel.background = element_rect(fill = "white", color = NA), panel.border = element_rect(color = "black", fill = NA, size = .5), panel.grid.major = element_line(color = "grey80", size = .5),
+    panel.grid.minor = element_line(color = "grey80", size = .5))
+
+
+```
+
+#Child race
+```{r, echo=FALSE}
+TOPSTeensAndOpioidUsCRace <- TOPSTeensAndOpioidUs %>%
+  mutate(Race = case_when(
+    `What best describes your child's race? (select all that apply) (choice=American Indian/Alaska Native)` == "Checked" ~ "American Indian/Alaska Native",
+    `What best describes your child's race? (select all that apply) (choice=Asian)` == "Checked" ~ "Asian",
+    `What best describes your child's race? (select all that apply) (choice=Black or African American)` == "Checked" ~ "Black or African American",
+    `What best describes your child's race? (select all that apply) (choice=Native Hawaiian or Other Pacific Islander)` == "Checked" ~ "Native Hawaiian or Other Pacific Islander",
+    `What best describes your child's race? (select all that apply) (choice=White)` == "Checked" ~ "White",
+    `What best describes your child's race? (select all that apply) (choice=Other)` == "Checked" ~ "Other",
+    TRUE ~ NA_character_
+  ))  %>%
+  mutate(Race = factor(Race, levels = c("American Indian/Alaska Native", "Asian", "Black or African American", "Native Hawaiian or Other Pacific Islander", "White", "Other", NA_character_)))
+  
+ggplot(data = TOPSTeensAndOpioidUsCRace) + geom_bar(mapping = aes(x = Race), fill = "#8C1515") +
+  labs(title = "Child's Race", x = "", y = "Count") + theme(panel.background = element_rect(fill = "white", color = NA), panel.border = element_rect(color = "black", fill = NA, size = .5), panel.grid.major = element_line(color = "grey80", size = .5),
+    panel.grid.minor = element_line(color = "grey80", size = .5))
+
+```
+
+#Parent highlest level of education
+```{r, echo=FALSE}
+TOPSTeensAndOpioidUsReordered <- TOPSTeensAndOpioidUs %>%
+  mutate(`What is the highest level of education you have completed?` = factor(`What is the highest level of education you have completed?`, 
+    levels = c("High school or less", "Vocational or trade school / some college or university", "College or university", "Graduate degree or professional school", NA_character_)))
+
+ggplot(data = TOPSTeensAndOpioidUsReordered) + geom_bar(mapping = aes(x = `What is the highest level of education you have completed?`), fill = "#8C1515") +
+  scale_x_discrete(guide = guide_axis(n.dodge = 2)) +
+  labs(title = "What is the highest level of education you have completed?", x = "", y = "Count") + theme(panel.background = element_rect(fill = "white", color = NA), panel.border = element_rect(color = "black", fill = NA, size = .5), panel.grid.major = element_line(color = "grey80", size = .5),
+    panel.grid.minor = element_line(color = "grey80", size = .5), plot.margin = margin(15, 15, 15, 15, "pt"))
+
+```
+
+#Household income
+```{r, echo=FALSE}
+TOPSTeensAndOpioidUsReordered2 <- TOPSTeensAndOpioidUs %>%
+  mutate(`What is your household's total annual income before taxes?` = factor(`What is your household's total annual income before taxes?`, 
+    levels = c("$200,000 or more", "$150,000 - $199,999", "$100,000 - $149,999", "$75,000 - $99,999", "$50,000 - $74,999","$25,000 - $49,999", "Less than $24,999", NA_character_)))
+
+ggplot(data = TOPSTeensAndOpioidUsReordered2) + geom_bar(mapping = aes(x = `What is your household's total annual income before taxes?`), fill = "#8C1515") + scale_x_discrete(guide = guide_axis(n.dodge = 2)) +
+  labs(title = "What is your household's total annual income before taxes?", x = "", y = "Count") + theme(panel.background = element_rect(fill = "white", color = NA), panel.border = element_rect(color = "black", fill = NA, size = .5), panel.grid.major = element_line(color = "grey80", size = .5),
+    panel.grid.minor = element_line(color = "grey80", size = .5))
+
+```
+
+#Work Status
+```{r, echo=FALSE}
+ggplot(data = TOPSTeensAndOpioidUs) + geom_bar(mapping = aes(x = fct_relevel(`Are you currently working?`, "Full-time", "Part-time", "Not Working")), fill = "#8C1515") +
+  labs(title = "Are you currently working?", x = "", y = "Count") + theme(panel.background = element_rect(fill = "white", color = NA), panel.border = element_rect(color = "black", fill = NA, size = .5), panel.grid.major = element_line(color = "grey80", size = .5),
+    panel.grid.minor = element_line(color = "grey80", size = .5))
+
+```
+
+#Marital Status
+```{r, echo=FALSE}
+ggplot(data = TOPSTeensAndOpioidUs) + geom_bar(mapping = aes(x = fct_relevel(`What is your current marital status?`, "Married", "Divorced", "Single")), fill = "#8C1515") +
+  labs(title = "What is your current marital status?", x = "", y = "Count") + theme(panel.background = element_rect(fill = "white", color = NA), panel.border = element_rect(color = "black", fill = NA, size = .5), panel.grid.major = element_line(color = "grey80", size = .5),
+    panel.grid.minor = element_line(color = "grey80", size = .5))
+
+```
+
+#Child Prior Surgeries
+```{r, echo=FALSE}
+ggplot(data = TOPSTeensAndOpioidUs) + geom_bar(mapping = aes(x = `How many prior surgeries has your child had (excluding this surgery)?`), fill = "#8C1515") +
+  labs(title = "How many prior surgeries has your child had (excluding this surgery)?", x = "", y = "Count") + theme(panel.background = element_rect(fill = "white", color = NA), panel.border = element_rect(color = "black", fill = NA, size = .5), panel.grid.major = element_line(color = "grey80", size = .5),
+    panel.grid.minor = element_line(color = "grey80", size = .5))
+
+```
+
+#Parent Prior Pain Conditions
+```{r, echo=FALSE}
+ggplot(data = TOPSTeensAndOpioidUs) + geom_bar(mapping = aes(x = fct_relevel(`Have you previously been diagnosed with a pain condition (e.g. chronic low back pain, chronic headaches)?`, "Yes", "No", "I don't now")), fill = "#8C1515") +
+  labs(title = "Have you previously been diagnosed with a pain condition?", x = "", y = "Count") + theme(panel.background = element_rect(fill = "white", color = NA), panel.border = element_rect(color = "black", fill = NA, size = .5), panel.grid.major = element_line(color = "grey80", size = .5),
+    panel.grid.minor = element_line(color = "grey80", size = .5))
+
+```
+
+#Number of Children in Household
+```{r, echo=FALSE}
+ggplot(data = TOPSTeensAndOpioidUs) + geom_bar(mapping = aes(x = `How many children (18 years or younger) live in your household?`), fill = "#8C1515") +
+  labs(title = "How many children (18 years or younger) live in your household?", x = "", y = "Count") + theme(panel.background = element_rect(fill = "white", color = NA), panel.border = element_rect(color = "black", fill = NA, size = .5), panel.grid.major = element_line(color = "grey80", size = .5),
+    panel.grid.minor = element_line(color = "grey80", size = .5))
+
+```
+
 
 # US Heat Map Pain
 ```{r}

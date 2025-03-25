@@ -1,0 +1,581 @@
+import delimited "G:\Shared drives\Rabbitts Groenewald Labs\Manuscripts\In progress\AirQAP\Data\AQIPain.csv"
+save "G:\Shared drives\Rabbitts Groenewald Labs\Manuscripts\In progress\AirQAP\Data\state_aqi.dta", replace
+use "G:\Shared drives\Rabbitts Groenewald Labs\Manuscripts\In progress\AirQAP\Data\state_aqi.dta"
+bysort state: gen sort=_n
+keep if sort==1
+save "G:\Shared drives\Rabbitts Groenewald Labs\Manuscripts\In progress\AirQAP\Data\state_agi_recoded.dta", replace
+
+use  "G:\Shared drives\Rabbitts Groenewald Labs\Manuscripts\In progress\AirQAP\Data\state_agi_recoded.dta", clear
+
+keep state cbsa cbsa avg_dayswithaqi avg_gooddays avg_moderatedays avg_unhealthyforsensitivegroupsd avg_unhealthydays avg_veryunhealthydays avg_hazardousdays avg_maxaqi avg_90thpercentileaqi avg_medianaqi avg_daysco avg_daysno2 avg_daysozone avg_dayspm25 avg_dayspm10 sort
+gen fipsst =.
+
+replace fipsst = 1 if state == "Alabama" 
+replace fipsst =2 if state   =="Alaska" 
+replace fipsst =4 if state   =="Arizona" 
+replace fipsst =5 if state   =="Arkansas" 
+replace fipsst =6 if state   =="California" 
+replace fipsst =8 if state   =="Colorado" 
+replace fipsst =9 if state   =="Connecticut" 
+replace fipsst =10 if state   =="Delaware" 
+replace fipsst =11 if state   =="District of Columbia" 
+replace fipsst =12 if state   =="Florida" 
+replace fipsst =13 if state   =="Georgia" 
+replace fipsst =15 if state   =="Hawaii" 
+replace fipsst =16 if state   =="Idaho" 
+replace fipsst =17 if state   =="Illinois" 
+replace fipsst =18 if state   =="Indiana" 
+replace fipsst =19 if state   =="Iowa" 
+replace fipsst =20 if state   =="Kansas" 
+replace fipsst =21 if state   =="Kentucky" 
+replace fipsst =22 if state   =="Louisiana" 
+replace fipsst =23 if state   =="Maine" 
+replace fipsst =24 if state   =="Maryland" 
+replace fipsst =25 if state   =="Massachusetts" 
+replace fipsst =26 if state   =="Michigan" 
+replace fipsst =27 if state   =="Minnesota" 
+replace fipsst =28 if state   =="Mississippi" 
+replace fipsst =29 if state   =="Missouri" 
+replace fipsst =30 if state   =="Montana" 
+replace fipsst =31 if state   =="Nebraska" 
+replace fipsst =32 if state   =="Nevada" 
+replace fipsst =33 if state   =="New Hampshire" 
+replace fipsst =34 if state   =="New Jersey" 
+replace fipsst =35 if state   =="New Mexico" 
+replace fipsst =36 if state   =="New York" 
+replace fipsst =37 if state   =="North Carolina" 
+replace fipsst =38 if state   =="North Dakota" 
+replace fipsst =39 if state   =="Ohio" 
+replace fipsst =40 if state   =="Oklahoma" 
+replace fipsst =41 if state   =="Oregon" 
+replace fipsst =42 if state   =="Pennsylvania" 
+replace fipsst =44 if state   =="Rhode Island" 
+replace fipsst =45 if state   =="South Carolina" 
+replace fipsst =46 if state   =="South Dakota" 
+replace fipsst =47 if state   =="Tennessee" 
+replace fipsst =48 if state   =="Texas" 
+replace fipsst =49 if state   =="Utah" 
+replace fipsst =50 if state   =="Vermont" 
+replace fipsst =51 if state   =="Virginia" 
+replace fipsst =53 if state   =="Washington" 
+replace fipsst =54 if state   =="West Virginia" 
+replace fipsst =55 if state   =="Wisconsin" 
+replace fipsst =56 if state   =="Wyoming" 
+replace fipsst =90 if state   =="Not in universe" 
+replace fipsst =95 if state   =="Logical skip" 
+replace fipsst =98 if state   =="Suppressed for confidentiality" 
+replace fipsst =99 if state   =="No valid response" 
+
+save "G:\Shared drives\Rabbitts Groenewald Labs\Manuscripts\In progress\AirQAP\Data\fipsst_aqi.dta", replace
+
+use "G:\My Drive\Projects\NSCH\data\2022\nsch_2022.dta", clear
+merge m:1 fipsst using "G:\Shared drives\Rabbitts Groenewald Labs\Manuscripts\In progress\AirQAP\Data\fipsst_aqi.dta"
+
+*which states missing:
+tab fipsst _merge,m
+*DC and Rhode Island
+
+lab def yn 0"No"1"Yes"
+*Age
+recode sc_age_years (0/5=1)(6/11=2)(12/14=3)(15/17=4)(else=.), generate (agecat)
+lab var agecat "Age categories"
+lab def agecat 1"0-5 years"2"6-11 years"3"12-14 years"4"15-17 years"
+lab val agecat agecat 
+
+*Sex: sc_sex
+lab def sc_sex 1"Male" 2"Female"
+lab val sc_sex sc_sex
+
+lab val a1_sex sc_sex
+lab val a2_sex sc_sex
+
+*Race and ethnicity
+recode sc_race_r (1=1)(2=2)(3=5)(4=4)(5=5)(6=5)(7=5),generate(race_eth)
+replace race_eth=3 if sc_hispanic_r==1
+lab var race_eth "Race and ethnicity"
+lab def race_eth 1"White, non-Hispanic"2"Black, non-Hispanic"3"Hispanic"4"Asian"5"Other/multirace"
+lab val race_eth race_eth
+
+*Insurance
+recode instype (1=2)(2=1)(3=1)(5=3), generate(inscov)
+lab var inscov "Insurance type"
+lab def inscov 1"Private" 2"Public only" 3"Uninsured" 
+lab val inscov inscov
+
+
+*Recode poverty level:
+recode fpl_i1 (0/99=1)(100/199=2)(200/399=3)(400/500=4), generate(povcat)
+lab var povcat "Poverty category"
+lab def povcat 1"0-99% FPL"2"100-199% FPL"3"200-399% FPL"4"400% FPL or greater"
+lab val povcat povcat
+
+recode fipsst ///
+(9=1)(23=1)(25=1)(33=1)(44=1)(50=1)(34=1)(36=1)(42=1) ///
+(18=2)(17=2)(26=2)(39=2)(55=2)(19=2)(20=2)(27=2)(29=2)(31=2)(38=2)(46=2) ///
+(10=3)(11=3)(12=3)(13=3)(24=3)(37=3)(37=3)(45=3)(51=3)(54=3)(1=3)(21=3)(28=3)(47=3)(5=3)(22=3)(40=3)(48=3) ///
+(4=4)(8=4)(16=4)(35=4)(30=4)(49=4)(32=4)(56=4)(2=4)(6=4)(15=4)(41=4)(53=4) ///
+,generate (region)
+lab var region "Census region"
+lab def region 1"Northeast" 2"Midwest" 3"South"4"West"
+lab val region region
+
+*Parent education
+* HIGRADE
+recode higrade_tvis (1=1)(2=2)(3=2)(4=3)(else=.), generate (higrade_rc)
+lab var higrade_rc "Parent education"
+lab def higrade_rc 1"Less then High School" 2"High School and some college/associates degree" 3"College degreee or higher"
+lab val higrade_rc higrade_rc
+
+*Child overall health:
+recode k2q01 (1=1)(2=1)(3=1)(4=2)(5=2)(else=.), generate (health)
+_crcslbl health k2q01 
+lab def health 1"Excellent or good" 2"Fair or poor"
+lab val health health
+
+*Chronic physical pain
+recode physicalpain (1=1)(2=0)(.l=0)(.m=.), generate(chrpain)
+lab var chrpain "Chronic pain"
+lab def chrpain 0"No" 1"Yes"
+lab val chrpain chrpain
+
+*Asthma
+recode k2q40a (1=1)(2=0)(.l=0)(.m=.), generate(asthma)
+lab var asthma "Asthma"
+lab def asthma 0"No" 1"Yes"
+lab val asthma asthma
+
+*Headache
+*Asthma
+recode headache (1=1)(2=0)(.l=0)(.m=.), generate(rc_headache)
+lab var rc_headache "Headache"
+lab def rc_headache 0"No" 1"Yes"
+lab val rc_headache rc_headache
+
+*analysis:
+svyset hhid, strata(stratum) weight(fwc) vce(linearized) singleunit(missing)
+
+*Main anaalysis:
+*chronic pain
+svy linearized : logistic chrpain c.avg_maxaqi
+*headache
+svy linearized : logistic rc_headache c.avg_maxaqi
+*asthma
+svy linearized : logistic asthma c.avg_maxaqi
+
+*chronic pain
+foreach x in avg_dayswithaqi avg_gooddays avg_moderatedays avg_unhealthyforsensitivegroupsd avg_unhealthydays avg_veryunhealthydays avg_hazardousdays avg_maxaqi avg_90thpercentileaqi avg_medianaqi avg_daysco avg_daysno2 avg_daysozone avg_dayspm25 avg_dayspm10 {
+	svy linearized, subpop (if sc_age_years >2) : logistic chrpain c.`x' 1.sc_sex i.race_eth i.inscov i.povcat i.health 
+	}
+	
+foreach x in avg_dayswithaqi avg_gooddays avg_moderatedays avg_unhealthyforsensitivegroupsd avg_unhealthydays avg_veryunhealthydays avg_hazardousdays avg_maxaqi avg_90thpercentileaqi avg_medianaqi avg_daysco avg_daysno2 avg_daysozone avg_dayspm25 avg_dayspm10 {
+	logistic chrpain c.`x'
+	}
+	
+*headache
+	foreach x in avg_dayswithaqi avg_gooddays avg_moderatedays avg_unhealthyforsensitivegroupsd avg_unhealthydays avg_veryunhealthydays avg_hazardousdays avg_maxaqi avg_90thpercentileaqi avg_medianaqi avg_daysco avg_daysno2 avg_daysozone avg_dayspm25 avg_dayspm10 {
+	svy linearized, subpop (if sc_age_years >2) : logistic rc_headache c.`x' i.sc_sex i.race_eth i.inscov i.povcat i.health 
+	}
+
+	
+*asthma
+foreach x in avg_dayswithaqi avg_gooddays avg_moderatedays avg_unhealthyforsensitivegroupsd avg_unhealthydays avg_veryunhealthydays avg_hazardousdays avg_maxaqi avg_90thpercentileaqi avg_medianaqi avg_daysco avg_daysno2 avg_daysozone avg_dayspm25 avg_dayspm10 {
+	svy linearized, subpop (if sc_age_years >2) : logistic asthma c.`x' i.sc_sex i.race_eth i.inscov i.povcat i.health 
+	}
+
+``````
+import delimited record_id redcap_event_name redcap_survey_identifier background_questionn_v_0 bqp1 bqp2 bqp3 bqp4 bqp5___1 bqp5___2 bqp5___3 bqp5___4 bqp5___5 bqp5___6 bqp5a bqp6 bqp6a bqp7 bqp7a bqp8 bqp9 bqp10a bqp10b bqp10c bqp10d bqp10e bqp10f bqp10g bqp10h bqp10i bqp10j bqp11 bqp11a bqp12 bqp13 bqp14 bqp15 bqp16 bqp17___1 bqp17___2 bqp17___3 bqp17___4 bqp17___5 bqp17___99 bqp17a bqp18 background_questionn_v_1 using "TOPSTeensAndOpioidUs_DATA_NOHDRS_2024-07-02_0947.csv", varnames(nonames)
+label data "TOPSTeensAndOpioidUs_DATA_NOHDRS_2024-07-02_0947.csv"
+
+label define bqp1_ 1 "Male" 2 "Female" 
+label define bqp2_ 1 "Mother" 2 "Father" 3 "Aunt" 4 "Uncle" 5 "Grandmother" 6 "Grandfather" 7 "Sister" 8 "Brother" 9 "Other" 
+label define bqp4_ 1 "Yes" 0 "No" 3 "Unknown" 
+label define bqp5___1_ 0 "Unchecked" 1 "Checked" 
+label define bqp5___2_ 0 "Unchecked" 1 "Checked" 
+label define bqp5___3_ 0 "Unchecked" 1 "Checked" 
+label define bqp5___4_ 0 "Unchecked" 1 "Checked" 
+label define bqp5___5_ 0 "Unchecked" 1 "Checked" 
+label define bqp5___6_ 0 "Unchecked" 1 "Checked" 
+label define bqp7_ 1 "Yes" 0 "No" 3 "I dont know" 99 "Other" 
+label define bqp8_ 1 "1" 2 "2" 3 "3" 4 "4" 5 "5" 6 "6" 7 "7" 8 "8" 9 "9" 10 "10+" 
+label define bqp9_ 1 "1" 2 "2" 3 "3" 4 "4" 5 "5" 6 "6" 7 "7" 8 "8" 9 "9" 10 "10+" 
+label define bqp10a_ 0 "less than 1 year" 1 "1" 2 "2" 3 "3" 4 "4" 5 "5" 6 "6" 7 "7" 8 "8" 9 "9" 10 "10" 11 "11" 12 "12" 13 "13" 14 "14" 15 "15" 16 "16" 17 "17" 18 "18" 
+label define bqp10b_ 0 "less than 1 year" 1 "1" 2 "2" 3 "3" 4 "4" 5 "5" 6 "6" 7 "7" 8 "8" 9 "9" 10 "10" 11 "11" 12 "12" 13 "13" 14 "14" 15 "15" 16 "16" 17 "17" 18 "18" 
+label define bqp10c_ 0 "less than 1 year" 1 "1" 2 "2" 3 "3" 4 "4" 5 "5" 6 "6" 7 "7" 8 "8" 9 "9" 10 "10" 11 "11" 12 "12" 13 "13" 14 "14" 15 "15" 16 "16" 17 "17" 18 "18" 
+label define bqp10d_ 0 "less than 1 year" 1 "1" 2 "2" 3 "3" 4 "4" 5 "5" 6 "6" 7 "7" 8 "8" 9 "9" 10 "10" 11 "11" 12 "12" 13 "13" 14 "14" 15 "15" 16 "16" 17 "17" 18 "18" 
+label define bqp10e_ 0 "less than 1 year" 1 "1" 2 "2" 3 "3" 4 "4" 5 "5" 6 "6" 7 "7" 8 "8" 9 "9" 10 "10" 11 "11" 12 "12" 13 "13" 14 "14" 15 "15" 16 "16" 17 "17" 18 "18" 
+label define bqp10f_ 0 "less than 1 year" 1 "1" 2 "2" 3 "3" 4 "4" 5 "5" 6 "6" 7 "7" 8 "8" 9 "9" 10 "10" 11 "11" 12 "12" 13 "13" 14 "14" 15 "15" 16 "16" 17 "17" 18 "18" 
+label define bqp10g_ 0 "less than 1 year" 1 "1" 2 "2" 3 "3" 4 "4" 5 "5" 6 "6" 7 "7" 8 "8" 9 "9" 10 "10" 11 "11" 12 "12" 13 "13" 14 "14" 15 "15" 16 "16" 17 "17" 18 "18" 
+label define bqp10h_ 0 "less than 1 year" 1 "1" 2 "2" 3 "3" 4 "4" 5 "5" 6 "6" 7 "7" 8 "8" 9 "9" 10 "10" 11 "11" 12 "12" 13 "13" 14 "14" 15 "15" 16 "16" 17 "17" 18 "18" 
+label define bqp10i_ 0 "less than 1 year" 1 "1" 2 "2" 3 "3" 4 "4" 5 "5" 6 "6" 7 "7" 8 "8" 9 "9" 10 "10" 11 "11" 12 "12" 13 "13" 14 "14" 15 "15" 16 "16" 17 "17" 18 "18" 
+label define bqp10j_ 0 "less than 1 year" 1 "1" 2 "2" 3 "3" 4 "4" 5 "5" 6 "6" 7 "7" 8 "8" 9 "9" 10 "10" 11 "11" 12 "12" 13 "13" 14 "14" 15 "15" 16 "16" 17 "17" 18 "18" 
+label define bqp11_ 1 "Common law" 2 "Divorced" 3 "Married" 4 "Separated" 5 "Single" 6 "Widowed" 99 "Other (Please specify)" 
+label define bqp12_ 1 "Full-time" 2 "Part-time" 3 "Not working" 
+label define bqp13_ 1 "High school or less" 2 "Vocational or trade school / some college or university" 3 "College or university" 4 "Graduate degree or professional school" 
+label define bqp14_ 1 "Full-time" 2 "Part-time" 3 "Not working" 
+label define bqp15_ 1 "High school or less" 2 "Vocational or trade school / some college or university" 3 "College or university" 4 "Graduate degree or professional school" 
+label define bqp16_ 1 "Yes" 2 "No" 0 "Unknown" 
+label define bqp17___1_ 0 "Unchecked" 1 "Checked" 
+label define bqp17___2_ 0 "Unchecked" 1 "Checked" 
+label define bqp17___3_ 0 "Unchecked" 1 "Checked" 
+label define bqp17___4_ 0 "Unchecked" 1 "Checked" 
+label define bqp17___5_ 0 "Unchecked" 1 "Checked" 
+label define bqp17___99_ 0 "Unchecked" 1 "Checked" 
+label define bqp18_ 1 "Less than $24,999" 2 "$25,000 - $49,999" 3 "$50,000 - $74,999" 4 "$75,000 - $99,999" 5 "$100,000 - $149,999" 6 "$150,000 - $199,999" 7 "$200,000 or more" 
+label define background_questionn_v_1_ 0 "Incomplete" 1 "Unverified" 2 "Complete" 
+label values bqp1 bqp1_
+label values bqp2 bqp2_
+label values bqp4 bqp4_
+label values bqp5___1 bqp5___1_
+label values bqp5___2 bqp5___2_
+label values bqp5___3 bqp5___3_
+label values bqp5___4 bqp5___4_
+label values bqp5___5 bqp5___5_
+label values bqp5___6 bqp5___6_
+label values bqp7 bqp7_
+label values bqp8 bqp8_
+label values bqp9 bqp9_
+label values bqp10a bqp10a_
+label values bqp10b bqp10b_
+label values bqp10c bqp10c_
+label values bqp10d bqp10d_
+label values bqp10e bqp10e_
+label values bqp10f bqp10f_
+label values bqp10g bqp10g_
+label values bqp10h bqp10h_
+label values bqp10i bqp10i_
+label values bqp10j bqp10j_
+label values bqp11 bqp11_
+label values bqp12 bqp12_
+label values bqp13 bqp13_
+label values bqp14 bqp14_
+label values bqp15 bqp15_
+label values bqp16 bqp16_
+label values bqp17___1 bqp17___1_
+label values bqp17___2 bqp17___2_
+label values bqp17___3 bqp17___3_
+label values bqp17___4 bqp17___4_
+label values bqp17___5 bqp17___5_
+label values bqp17___99 bqp17___99_
+label values bqp18 bqp18_
+label values background_questionn_v_1 background_questionn_v_1_
+
+label variable record_id "Record ID"
+label variable redcap_event_name "Event Name"
+label variable redcap_survey_identifier "Survey Identifier"
+label variable background_questionn_v_0 "Survey Timestamp"
+label variable bqp1 "What sex were you assigned at birth?"
+label variable bqp2 "What is your relationship to the child/teen participating in this study?"
+label variable bqp3 "Other relationship:"
+label variable bqp4 "Does your child identify as having a Hispanic or Latino ethnic background?"
+label variable bqp5___1 "What best describes your childs race? (select all that apply) (choice=American Indian/Alaska Native)"
+label variable bqp5___2 "What best describes your childs race? (select all that apply) (choice=Asian)"
+label variable bqp5___3 "What best describes your childs race? (select all that apply) (choice=Native Hawaiian or Other Pacific Islander)"
+label variable bqp5___4 "What best describes your childs race? (select all that apply) (choice=Black or African American)"
+label variable bqp5___5 "What best describes your childs race? (select all that apply) (choice=White)"
+label variable bqp5___6 "What best describes your childs race? (select all that apply) (choice=Other)"
+label variable bqp5a "Other race:"
+label variable bqp6 "How many prior surgeries has your child had (excluding this surgery)?"
+label variable bqp6a "Please list all prior surgeries:"
+label variable bqp7 "Have you previously been diagnosed with a pain condition (e.g. chronic low back pain, chronic headaches)? "
+label variable bqp7a "Pain Condition:"
+label variable bqp8 "Including you, how many people live in your household?"
+label variable bqp9 "How many children (18 years or younger) live in your household?"
+label variable bqp10a "Child 1"
+label variable bqp10b "Child 2"
+label variable bqp10c "Child 3"
+label variable bqp10d "Child 4"
+label variable bqp10e "Child 5"
+label variable bqp10f "Child 6"
+label variable bqp10g "Child 7"
+label variable bqp10h "Child 8"
+label variable bqp10i "Child 9"
+label variable bqp10j "Child 10"
+label variable bqp11 "What is your current marital status?"
+label variable bqp11a "Other marital status:"
+label variable bqp12 "Are you currently working?"
+label variable bqp13 "What is the highest level of education you have completed?"
+label variable bqp14 "Does your spouse/partner work?"
+label variable bqp15 "What is the highest level of education your spouse/partner has completed?"
+label variable bqp16 "Do you identify as having a Hispanic or Latino ethnic background?"
+label variable bqp17___1 "What best describes your race? (select all that apply) (choice=American Indian/Alaska Native)"
+label variable bqp17___2 "What best describes your race? (select all that apply) (choice=Asian)"
+label variable bqp17___3 "What best describes your race? (select all that apply) (choice=Native Hawaiian or Other Pacific Islander)"
+label variable bqp17___4 "What best describes your race? (select all that apply) (choice=Black or African American)"
+label variable bqp17___5 "What best describes your race? (select all that apply) (choice=White)"
+label variable bqp17___99 "What best describes your race? (select all that apply) (choice=Other)"
+label variable bqp17a "Other race:"
+label variable bqp18 "What is your households total annual income before taxes?"
+label variable background_questionn_v_1 "Complete?"
+
+order record_id redcap_event_name redcap_survey_identifier background_questionn_v_0 bqp1 bqp2 bqp3 bqp4 bqp5___1 bqp5___2 bqp5___3 bqp5___4 bqp5___5 bqp5___6 bqp5a bqp6 bqp6a bqp7 bqp7a bqp8 bqp9 bqp10a bqp10b bqp10c bqp10d bqp10e bqp10f bqp10g bqp10h bqp10i bqp10j bqp11 bqp11a bqp12 bqp13 bqp14 bqp15 bqp16 bqp17___1 bqp17___2 bqp17___3 bqp17___4 bqp17___5 bqp17___99 bqp17a bqp18 background_questionn_v_1 
+set more off
+describe
+
+```````
+cd "G:\Shared drives\Rabbitts Groenewald Labs\Manuscripts\In progress\PCEs and Sleep Deficiency, NSCH\PCE's and sleep\"
+use "pce_sleep_2021.dta"
+svyset hhid, strata(stratum) weight(fwc) vce(linearized) singleunit(missing)
+
+svy linearized, subpop (if indic==1): logistic sleep i.cat_pce 
+
+
+*Table 1. Sample characteristics:
+*First column is sample size total:
+	tabout  ///
+		cat_pce ///
+		sleep ///
+		agecattable sex_2021 race_eth ///
+		povlev4_2021 inscov ///
+		rc_family_r rc_hhlanguage higrade_rc ///
+		region ///
+		chrpain /// 
+		if indic==1 ///
+		using "table_1_totals.xls" , replace c(freq) f(1 1) clab(row_% CI) percent lines(none) ///
+				ptotal(none)
+				
+*Second column is prevalence % weighted sample:				
+	tabout  ///
+		cat_pce ///
+		sleep ///
+		agecattable sex_2021 race_eth ///
+		povlev4_2021 inscov ///
+		rc_family_r rc_hhlanguage higrade_rc ///
+		region ///
+		chrpain /// 
+		if indic==1 ///
+		using "table_1_percentages.xls", replace c(col ci) f(1 1) clab(col_% CI) svy nwt(fwc)  pop percent lines(none) ptotal(none)
+			
+*Third column is prevalence of treated unfairly due to sexual orienation or gender:
+*	tabout  ///
+*		cat_pce ///
+*		sleep ///
+*		agecattable sex_2021 race_eth ///
+*		povlev4_2021 inscov ///
+*		rc_family_r rc_hhlanguage higrade_rc ///
+*		region ///
+*		chrpain /// 
+*		if indic==1 ///
+*		using "G:\My Drive\Projects\NSCH\projects\PCE's and sleep\table_1_prevlance.xls", replace c(row ci) f(1 1) clab(col_% CI) svy nwt(fwc)  pop percent *lines(none) ptotal(none)
+			
+*Table 2:
+*Main analysis:
+svy linearized, subpop (if indic==1): tab cat_pce sleep, row percent ci format(%5.1f)  pearson
+svy linearized, subpop (if indic==1): logistic sleep i.cat_pce ///
+sc_age_year ///
+i.sex_2021 i.race_eth ///
+i. povlev4_2021 ///
+i.inscov ///
+i.rc_family_r i.rc_hhlanguage i.higrade_rc ///
+i.region
+
+*Table3 : Plan ot recreate Table 3 of Susan Lin ACes articel in Academic Pediatrics
+di in r "Table 2: Associations between each positive childhood experienceand insufficient sleep. Sopurce: Nationl Survey of Children's Health, 2020-2021" 
+
+	tabout 		///
+	volunteer_2021 ///
+	AftSchAct_2021 ///
+	mentor_2021 ///
+	FamResilience_2021 ///
+	ShareIdeas_2021 ///
+	NbhdSupp_2021 ///
+	NbhdSafe_2021  /// 
+			sleep if indic==1  /// 
+			using "table_2_percentages.xls", replace c(row ci) f(1 1) clab(col_% CI) svy nwt(fwc)  pop percent lines(none) ptotal(none)
+		
+	foreach x in ///
+	volunteer_2021 ///
+	AftSchAct_2021 ///
+	mentor_2021 ///
+	FamResilience_2021 ///
+	ShareIdeas_2021 ///
+	NbhdSupp_2021 ///
+	NbhdSafe_2021  /// 
+		{
+	svy linearized, subpop (if indic==1): logistic sleep i.`x' ///
+	sc_age_year ///
+	i.sex_2021 i.race_eth ///
+	i. povlev4_2021 ///
+	i.inscov ///
+	i.rc_family_r i.rc_hhlanguage i.higrade_rc ///
+	i.region
+			}
+	
+	
+*Table 3:	
+	*Multivariate Associations between chronic pain and PCE's
+	*Prevalence of chronic pain by PCEs scores for each of 4 ACEs exposure levels:
+	*No ACES reported
+	*Prevalence:
+	svy linearized, subpop(if ace_multi==0 & indic==1) : tabulate cat_pce sleep, row ci percent
+	*Multivariate:
+	svy linearized, subpop (if ace_multi==0 & indic==1): logistic sleep i.cat_pce ///
+	i.sex_2021 i.race_eth ///
+			i. povlev4_2021 inscov ///
+								rc_family_r rc_hhlanguage higrade_rc ///
+									region
+					
+	*1 ACE reported
+	*Prevalence:
+	svy linearized, subpop(if ace_multi==1 & indic==1) : tabulate cat_pce sleep, row ci percent
+	*Multivariate:
+	svy linearized, subpop (if ace_multi==1 & indic==1): logistic sleep i.cat_pce ///
+	 i.sex_2021 i.race_eth ///
+			i. povlev4_2021 inscov ///
+								rc_family_r rc_hhlanguage higrade_rc ///
+									region
+		
+	*2 or more  ACE reported
+	*Prevalence:
+	svy linearized, subpop(if ace_multi==2 & indic==1) : tabulate cat_pce sleep, row ci percent
+	*Multivariate:
+	svy linearized, subpop (if ace_multi==2 & indic==1): logistic sleep i.cat_pce ///
+	 i.sex_2021 i.race_eth ///
+			i. povlev4_2021 inscov ///
+								rc_family_r rc_hhlanguage higrade_rc ///
+									region
+									
+									
+*Figure 2.:
+*Contour plot
+*Interaction terms:
+*from: https://www.stata.com/stata-news/news32-1/spotlight/?utm_source=statanews&utm_campaign=news32-1&utm_medium=email&utm_content=spotlight
+*Continous:
+clear
+capture log close
+set more off
+use "pce_sleep_2021.dta"
+svyset hhid, strata(stratum) weight(fwc) vce(linearized) singleunit(missing)
+*
+svy :logistic sleep acetotal nr_pce c.acetotal#c.nr_pce
+margins, at (acetotal=(0(1)9)) vce (unconditional)
+marginsplot
+margins, at (nr_pce=(0(1)7)) vce (unconditional)
+marginsplot
+margins, at(acetotal=(0(1)9) nr_pce=(0(1)7)) vce(unconditional) saving(predictions, replace)
+use predictions, clear
+rename _at1 acetotal
+rename _at2 nr_pce
+rename _margin pr_sleep
+list acetotal nr_pce pr_sleep in 1/20
+twoway contour pr_sleep acetotal nr_pce ///
+		  
+twoway  (contour pr_sleep acetotal nr_pce, ccuts(0(0.1)1.0)),   ///             
+  xlabel(0(1)7)                                                 ///  
+          ylabel(0(1)9, angle(horizontal))                         ///       
+          xtitle("PCEs")                                           ///    
+          ytitle("ACEs")                                             ///  
+          ztitle("Predicted probability of insufficient sleep")            ///         
+          title("Predicted probability of insufficient sleep by aces and pces")
+
+ graph save "Graph" "Figure 1. contour plot.gph", replace
+
+graph export "Figure 1. contour plot.jpg", as(jpg) name("Graph") quality(90) replace
+
+		  
+		  
+*Categorical:
+clear
+capture log close
+set more off
+use "pce_sleep_2021.dta"
+svyset hhid, strata(stratum) weight(fwc) vce(linearized) singleunit(missing)
+*	  
+svy:logistic sleep ace_multi cat_pce c.ace_multi#c.cat_pce i.agecat i.sex_2021 i.race_eth ///
+		i. povlev4_2021 inscov ///
+							rc_family_r rc_hhlanguage higrade_rc ///
+								region
+margins, subpop (if indic==1) at (ace_multi=(0(1)2)) vce (unconditional)
+marginsplot
+margins, subpop (if indic==1) at (cat_pce=(1(1)3)) vce (unconditional)
+marginsplot
+margins,subpop (if indic==1) at(ace_multi=(0(1)2) cat_pce=(1(1)3)) vce(unconditional) saving(predictions, replace)
+use predictions, clear
+rename _at1 acetotal
+rename _at2 nr_pce
+rename _margin pr_sleep
+list acetotal nr_pce pr_sleep 
+ twoway (contour pr_sleep acetotal nr_pce, scolor(red) ecolor(blue)), xlabel(1 "0-2" 2"3-4" 3"5-7") ylabel(0"0" 1"1" 2"2+", angle(horizontal)) xtitle("PCEs")ytitle("ACEs") ztitle("Predicted probability of chronic pain")title("Predicted probability of insufficient sleep by aces and pces")
+	  
+export excel using "Contour plot data.xls", replace
+
+
+***
+clear
+capture log close
+set more off
+use "pce_sleep_2021.dta"
+svyset hhid, strata(stratum) weight(fwc) vce(linearized) singleunit(missing)
+*
+svy : logistic sleep i.nr_pce ///
+i.agecat ///
+i.sex_2021 i.race_eth ///
+i. povlev4_2021 ///
+i.inscov ///
+i.rc_family_r i.rc_hhlanguage i.higrade_rc ///
+i.region
+margins, at (nr_pce=(0(1)7)) vce (unconditional)
+marginsplot
+
+`````````
+* Load Dataset
+use "C:\Users\Sebastian Pintea\OneDrive\Documents\Stanford Summer R\NSCH_2022e_Topical_STATA_CAHMI_DRC_v2.dta", clear
+
+* Focus Variables
+keep fipsst sc_age_years sc_sex race7_22 povSCHIP_22 k11q43r BornUSA_22 depress_22 DiffPain_22 
+
+* Summarize missing values in k2q40a
+misstable summarize sc_age_years
+misstable summarize sc_sex
+misstable summarize race7_22
+misstable summarize povSCHIP_22
+misstable summarize k11q43r
+misstable summarize BornUSA_22
+misstable summarize depress_22
+misstable summarize DiffPain_22
+
+* Check distribution including missing values
+tabulate sc_age_years, missing
+tabulate sc_sex, missing
+tabulate depress_22, missing
+tabulate DiffPain_22, missing
+tabulate race7_22, missing
+tabulate povSCHIP_22, missing
+tabulate k11q43r, missing
+tabulate BornUSA_22, missing
+
+* Remove rows with missing values in k2q40a
+drop if missing(sc_age_years)
+drop if missing(sc_sex)
+drop if missing(depress_22)
+drop if missing(DiffPain_22)
+drop if missing(race7_22)
+drop if missing(povSCHIP_22)
+drop if missing(k11q43r)
+drop if missing(BornUSA_22)
+
+*Get information on variables
+describe race7_22
+label list race7
+describe sc_sex
+label list sc_sex_lab
+tab povSCHIP_22
+describe povSCHIP_22
+label list povSCHIP
+
+*Generate Variables
+rename sc_age_years age
+rename sc_sex sex
+gen depression = (depress_22 == 3)
+rename fipsst state
+gen history_moving = "Yes" if k11q43r > 0
+replace history_moving = "No" if k11q43r <= 0
+rename race7_22 race_ethnicity
+gen chronic_pain = (DiffPain_22 == 1)
+rename povSCHIP_22 hhi_poverty_level
+gen US_birthplace = (BornUSA_22 == 1)
+
+*Focus variables
+keep state sex age race_ethnicity hhi_poverty_level US_birthplace history_moving depression chronic_pain
+
+export delimited using "indiv_multivariable.csv", replace
+
